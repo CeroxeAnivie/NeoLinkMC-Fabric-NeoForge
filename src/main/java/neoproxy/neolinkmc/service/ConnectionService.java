@@ -233,26 +233,23 @@ public final class ConnectionService {
             neoTransferSocket = new SecureSocket(config.getRemoteDomain(), config.getConnectPort());
             neoTransferSocket.sendStr("TCP;" + socketID);
 
-            if (config.isShowConnection()) {
-                messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
-                        config.getLocalDomain() + ":" + effectiveLocalPort + languageData.BUILD_UP);
-            }
+            // 输出连接建立信息到日志
+            messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
+                    config.getLocalDomain() + ":" + effectiveLocalPort + languageData.BUILD_UP);
 
-            TCPTransformer serverToNeoTask = new TCPTransformer(neoTransferSocket, localServerSocket, config.isEnableProxyProtocol());
+            // enableProxyProtocol 硬编码为 false，PPv2 头会被剥离不传给 Minecraft
+            TCPTransformer serverToNeoTask = new TCPTransformer(neoTransferSocket, localServerSocket, false);
             TCPTransformer neoToServerTask = new TCPTransformer(localServerSocket, neoTransferSocket, false);
             ThreadManager manager = new ThreadManager(serverToNeoTask, neoToServerTask);
 
             manager.startAsyncWithCallback(result -> {
-                if (config.isShowConnection()) {
-                    messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
-                            config.getLocalDomain() + ":" + effectiveLocalPort + languageData.DESTROY);
-                }
+                // 输出连接断开信息到日志
+                messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
+                        config.getLocalDomain() + ":" + effectiveLocalPort + languageData.DESTROY);
                 manager.close();
             });
         } catch (Exception e) {
-            if (config.isShowConnection()) {
-                messageHandler.info(languageData.FAIL_TO_CONNECT_LOCALHOST + config.getLocalDomain() + ":" + getLocalPort());
-            }
+            messageHandler.info(languageData.FAIL_TO_CONNECT_LOCALHOST + config.getLocalDomain() + ":" + getLocalPort());
             closeQuietly(localServerSocket);
             closeQuietly(neoTransferSocket);
         }
@@ -330,8 +327,6 @@ public final class ConnectionService {
         int hookPort = getIntFromConfig("host_hook_port", 44801);
         int connectPort = getIntFromConfig("host_connect_port", 44802);
         int configLocalPort = getIntFromConfig("local_port", 25565);
-        boolean showConnection = getBooleanFromConfig("show_connection", true);
-        boolean enableProxyProtocol = getBooleanFromConfig("enable_proxy_protocol", false);
 
         // 优先使用外部设置的端口（与老代码逻辑一致）
         int effectiveLocalPort = localPort > 0 ? localPort : configLocalPort;
@@ -342,8 +337,6 @@ public final class ConnectionService {
                 .hookPort(hookPort)
                 .connectPort(connectPort)
                 .localPort(effectiveLocalPort)
-                .showConnection(showConnection)
-                .enableProxyProtocol(enableProxyProtocol)
                 .build();
     }
 

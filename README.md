@@ -78,8 +78,7 @@
 
 ```
 .minecraft/config/neolinkmc/
-├── config.json     # 主配置文件（JSON格式）
-└── eula.txt        # 用户许可协议
+└── config.json     # 主配置文件（JSON格式）
 ```
 
 ### config.json 详解
@@ -95,9 +94,7 @@
   "onlinemode": "OFFLINE_TRY_ONLINE_UUID_FIRST",
   "pvp_allowed": true,
   "allow_cheats": true,
-  "max_players": 8,
-  "show_connection": true,
-  "enable_proxy_protocol": false
+  "max_players": 8
 }
 ```
 
@@ -115,8 +112,6 @@
 | `pvp_allowed` | boolean | `true` | 是否允许 PVP |
 | `allow_cheats` | boolean | `true` | 是否允许作弊 |
 | `max_players` | int | `8` | 最大玩家数 |
-| `show_connection` | boolean | `true` | 是否在控制台显示 TCP 连接建立/断开信息 |
-| `enable_proxy_protocol` | boolean | `false` | 是否启用 Proxy Protocol v2（用于获取真实玩家 IP） |
 
 **注意**：密钥(key)不会保存到配置文件中，每次启动时需要手动输入或使用默认密钥 "Free"。
 
