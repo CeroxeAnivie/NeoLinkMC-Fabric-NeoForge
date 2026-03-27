@@ -79,7 +79,6 @@
 ```
 .minecraft/config/neolinkmc/
 ├── config.json     # 主配置文件（JSON格式）
-├── node.json       # 多节点配置（可选）
 └── eula.txt        # 用户许可协议
 ```
 
@@ -97,11 +96,8 @@
   "pvp_allowed": true,
   "allow_cheats": true,
   "max_players": 8,
-  "tunnel_key": "",
-  "tunnel_server": "p.ceroxe.fun",
-  "tunnel_local_port": 25565,
-  "tunnel_hook_port": 44801,
-  "tunnel_host_connect_port": 44802
+  "show_connection": true,
+  "enable_proxy_protocol": false
 }
 ```
 
@@ -110,8 +106,8 @@
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `remote_domain` | string | `p.ceroxe.fun` | 远程服务器域名 |
-| `host_hook_port` | string | `44801` | 服务端指令端口 |
-| `host_connect_port` | string | `44802` | 服务端数据传输端口 |
+| `host_hook_port` | string | `44801` | 服务端指令端口（用于建立控制连接） |
+| `host_connect_port` | string | `44802` | 服务端数据传输端口（用于 TCP 连接转发） |
 | `local_port` | string | `25565` | 本地 Minecraft 服务器端口 |
 | `local_domain` | string | `localhost` | 本地服务地址 |
 | `gamemode` | string | `SURVIVAL` | 游戏模式：SURVIVAL/CREATIVE/ADVENTURE/SPECTATOR |
@@ -119,6 +115,10 @@
 | `pvp_allowed` | boolean | `true` | 是否允许 PVP |
 | `allow_cheats` | boolean | `true` | 是否允许作弊 |
 | `max_players` | int | `8` | 最大玩家数 |
+| `show_connection` | boolean | `true` | 是否在控制台显示 TCP 连接建立/断开信息 |
+| `enable_proxy_protocol` | boolean | `false` | 是否启用 Proxy Protocol v2（用于获取真实玩家 IP） |
+
+**注意**：密钥(key)不会保存到配置文件中，每次启动时需要手动输入或使用默认密钥 "Free"。
 
 #### 在线模式 (onlinemode) 说明
 
@@ -127,25 +127,6 @@
 | `ONLINE_ONLINE_UUID_ONLY` | 正版验证开启，仅正版玩家可加入 |
 | `OFFLINE_TRY_ONLINE_UUID_FIRST` | 正版验证关闭，优先使用正版 UUID（推荐） |
 | `OFFLINE_OFFLINE_UUID_ONLY` | 纯离线模式，使用离线 UUID |
-
-### node.json 多节点配置（可选）
-
-```json
-[
-  {
-    "name": "中国 - 宿迁",
-    "address": "p.ceroxe.fun",
-    "HOST_HOOK_PORT": 44801,
-    "HOST_CONNECT_PORT": 44802
-  },
-  {
-    "name": "日本 - 东京",
-    "address": "jp.example.com",
-    "HOST_HOOK_PORT": 9100,
-    "HOST_CONNECT_PORT": 9101
-  }
-]
-```
 
 ---
 
