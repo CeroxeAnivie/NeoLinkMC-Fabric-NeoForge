@@ -93,6 +93,10 @@ public abstract class ConfigContainer {
         ConfigManager.saveConfig();
     }
 
+    /**
+     * Modded 模式 - 用于与其他 Mod 集成
+     * 保留此模式以兼容可能依赖它的代码
+     */
     public static class Modded extends ConfigContainer {
         private GameType gameMode;
         private boolean commands;
@@ -130,7 +134,7 @@ public abstract class ConfigContainer {
     }
 
     /**
-     * 独立模式 - 用于 Cloth Config 完全接管界面
+     * 独立模式 - 用于 ModernUI 完全接管界面
      * 不依赖原版 ShareToLanScreen
      */
     public static class Standalone extends ConfigContainer {
