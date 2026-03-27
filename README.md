@@ -151,47 +151,6 @@ cd NeoLinkMC
 
 ---
 
-## 📁 项目结构
-
-```
-NeoLinkMC/
-├── src/main/java/neoproxy/neolinkmc/
-│   ├── NeoLinkMC.java                    # Mod 主入口
-│   ├── config/
-│   │   ├── ConfigManager.java            # JSON 配置管理
-│   │   └── LanguageData.java             # 多语言支持
-│   ├── gui/
-│   │   ├── core/                         # UI 核心组件
-│   │   ├── components/                   # 可复用组件
-│   │   ├── screens/                      # 界面页面
-│   │   │   ├── NeoLinkMainScreen.java    # 主界面
-│   │   │   ├── TunnelSettingsFragment.java  # 隧道设置
-│   │   │   └── GameSettingsFragment.java    # 游戏设置
-│   │   ├── OnlineMode.java               # 在线模式枚举
-│   │   └── ConfigContainer.java
-│   ├── mixin/
-│   │   └── MixinOpenToLanScreen.java     # 注入原版 LAN 界面
-│   ├── network/
-│   │   └── InternetOperator.java
-│   ├── service/
-│   │   ├── ConnectionService.java        # 连接服务核心
-│   │   ├── KeyValidator.java
-│   │   └── thread/                       # 后台线程
-│   │       ├── CheckAliveTask.java       # 心跳检测
-│   │       └── TCPTransformer.java       # TCP 数据转发
-│   └── util/
-│       ├── UUIDFixer.java                # UUID 修复工具
-│       └── VersionInfo.java
-└── src/main/resources/
-    ├── assets/neolinkmc/
-    │   ├── lang/zh_cn.json               # 中文语言文件
-    │   └── icon.png
-    ├── fabric.mod.json                   # Mod 元数据
-    └── neolinkmc.mixins.json             # Mixin 配置
-```
-
----
-
 ## 🔧 技术栈
 
 - **Java 21** - 现代 Java 语言特性
