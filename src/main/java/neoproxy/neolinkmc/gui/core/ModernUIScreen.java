@@ -37,7 +37,6 @@ public abstract class ModernUIScreen extends Fragment implements ScreenCallback 
      */
     protected void goBack() {
         if (lastScreen != null) {
-            // 使用 Minecraft 的屏幕切换
             net.minecraft.client.Minecraft.getInstance().setScreen(lastScreen);
         }
     }
@@ -47,7 +46,6 @@ public abstract class ModernUIScreen extends Fragment implements ScreenCallback 
      * 用于启动服务成功后直接回到游戏
      */
     protected void closeAllScreens() {
-        // 设置屏幕为 null，直接返回到游戏画面
         net.minecraft.client.Minecraft.getInstance().setScreen(null);
     }
 

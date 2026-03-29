@@ -1,14 +1,15 @@
 package neoproxy.neolinkmc.service.thread;
 
 import fun.ceroxe.api.utils.Sleeper;
-import neoproxy.neolinkmc.NeoLinkMC;
-import neoproxy.neolinkmc.service.ConnectionService;
+import neoproxy.neolinkmc.service.MessageHandler;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
 
 /**
- * 心跳检测任务
+ * 心跳检测任务 - 重构版本
  * <p>
  * 核心职责：
  * 1. 定期向服务器发送心跳包，保持连接活跃
@@ -16,67 +17,58 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 3. 连续失败达到阈值时自动关闭连接
  * <p>
  * 设计特点：
- * - 与 ConnectionService 关联，不依赖静态字段
+ * - 去除静态单例，改为实例化使用
+ * - 通过构造函数注入依赖（时间获取器、心跳发送器、消息处理器）
  * - 使用原子变量保证线程安全
  * - 守护线程，不阻止 JVM 退出
- * - 可安全启动和停止
- * - 通过 ConnectionService 的封装方法访问资源
  *
  * @author NeoProxy Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 public final class CheckAliveTask implements Runnable {
 
     private static final String HEARTBEAT_PACKET = "PING";
     private static final int MAX_CONSECUTIVE_FAILURES = 5;
-    private static final int HEARTBEAT_PACKET_DELAY = 1000;
+    private static final int HEARTBEAT_INTERVAL_MS = 1000;
     private static final long HEARTBEAT_THRESHOLD_MS = 2000;
 
-    private static volatile CheckAliveTask instance;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final LongSupplier lastReceivedTimeSupplier;
+    private final HeartbeatSender heartbeatSender;
+    private final MessageHandler messageHandler;
     private Thread heartbeatThread;
-    private ConnectionService service;
 
-    private CheckAliveTask() {
+    /**
+     * 心跳发送器函数式接口
+     */
+    @FunctionalInterface
+    public interface HeartbeatSender {
+        void send() throws IOException;
     }
 
-    private static CheckAliveTask getInstance() {
-        if (instance == null) {
-            synchronized (CheckAliveTask.class) {
-                if (instance == null) instance = new CheckAliveTask();
-            }
-        }
-        return instance;
+    public CheckAliveTask(LongSupplier lastReceivedTimeSupplier,
+                          HeartbeatSender heartbeatSender,
+                          MessageHandler messageHandler) {
+        this.lastReceivedTimeSupplier = lastReceivedTimeSupplier;
+        this.heartbeatSender = heartbeatSender;
+        this.messageHandler = messageHandler;
     }
 
-    public static void start(ConnectionService service) {
-        NeoLinkMC.LOGGER.debug("[CheckAliveTask] start() 被调用");
-        CheckAliveTask task = getInstance();
-        task.service = service;
-        task.startInternal();
-    }
-
-    public static void stop() {
-        NeoLinkMC.LOGGER.debug("[CheckAliveTask] stop() 被调用");
-        if (instance != null) {
-            instance.stopInternal();
-        }
-    }
-
-    private void startInternal() {
+    public void start() {
         if (isRunning.compareAndSet(false, true)) {
             heartbeatThread = new Thread(this, "NeoLink-Heartbeat");
             heartbeatThread.setDaemon(true);
             heartbeatThread.start();
-            NeoLinkMC.LOGGER.debug("[CheckAliveTask] 心跳线程已启动");
+            messageHandler.log("心跳线程已启动", MessageHandler.LogLevel.DEBUG);
         }
     }
 
-    private void stopInternal() {
+    public void stop() {
         if (isRunning.compareAndSet(true, false)) {
             if (heartbeatThread != null) {
                 heartbeatThread.interrupt();
             }
+            messageHandler.log("心跳线程已停止", MessageHandler.LogLevel.DEBUG);
         }
     }
 
@@ -85,35 +77,25 @@ public final class CheckAliveTask implements Runnable {
         AtomicInteger failureCount = new AtomicInteger(0);
 
         while (isRunning.get() && !Thread.currentThread().isInterrupted()) {
-            if (service == null || !service.isHookSocketAvailable()) {
-                Sleeper.sleep(HEARTBEAT_PACKET_DELAY);
-                continue;
-            }
-
-            long timeSinceLastRecv = System.currentTimeMillis() - service.getLastReceivedTime();
+            long timeSinceLastRecv = System.currentTimeMillis() - lastReceivedTimeSupplier.getAsLong();
 
             if (timeSinceLastRecv > HEARTBEAT_THRESHOLD_MS) {
                 try {
-                    synchronized (service.getHookSocketLock()) {
-                        service.sendHeartbeat();
-                    }
+                    heartbeatSender.send();
                     failureCount.set(0);
-                } catch (Exception e) {
-                    int currentFailures = failureCount.incrementAndGet();
-                    NeoLinkMC.LOGGER.debug("[CheckAliveTask] 心跳发送失败，次数: {}/{}", currentFailures, MAX_CONSECUTIVE_FAILURES);
+                } catch (IOException e) {
+                    int failures = failureCount.incrementAndGet();
+                    messageHandler.log("心跳发送失败 (" + failures + "/" + MAX_CONSECUTIVE_FAILURES + "): " + e.getMessage(),
+                            MessageHandler.LogLevel.WARN);
 
-                    if (currentFailures >= MAX_CONSECUTIVE_FAILURES) {
-                        NeoLinkMC.LOGGER.warn("[CheckAliveTask] 达到最大失败次数，关闭连接");
-                        service.closeHookSocket();
-                        stopInternal();
-                        break;
+                    if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                        messageHandler.send("连接已断开，心跳超时", MessageHandler.MessageType.ERROR);
+                        stop();
                     }
                 }
-            } else {
-                failureCount.set(0);
             }
 
-            Sleeper.sleep(HEARTBEAT_PACKET_DELAY);
+            Sleeper.sleep(HEARTBEAT_INTERVAL_MS);
         }
     }
 }

@@ -97,11 +97,21 @@ public final class NeoLinkMC implements ModInitializer, ClientModInitializer {
         }
     }
 
+    /**
+     * 版本号，从 Fabric Mod 元数据读取
+     */
+    public static final String VERSION = FabricLoader.getInstance()
+            .getModContainer(MOD_ID)
+            .map(container -> container.getMetadata().getVersion().getFriendlyString())
+            .orElse("unknown");
+
+    /**
+     * 获取版本号（兼容旧代码）
+     * @deprecated 直接使用 VERSION 常量
+     */
+    @Deprecated
     public static String getVersion() {
-        return FabricLoader.getInstance()
-                .getModContainer(MOD_ID)
-                .map(container -> container.getMetadata().getVersion().getFriendlyString())
-                .orElse("unknown");
+        return VERSION;
     }
 
     @Override

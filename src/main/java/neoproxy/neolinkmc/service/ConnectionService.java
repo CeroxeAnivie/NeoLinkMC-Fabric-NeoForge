@@ -7,7 +7,6 @@ import neoproxy.neolinkmc.config.ConnectionConfig;
 import neoproxy.neolinkmc.config.LanguageData;
 import neoproxy.neolinkmc.service.thread.CheckAliveTask;
 import neoproxy.neolinkmc.service.thread.TCPTransformer;
-import neoproxy.neolinkmc.util.VersionInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,16 +16,16 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 
 /**
- * 连接服务核心类
+ * 连接服务核心类 - 重构版本
  * <p>
  * 设计原则：
  * 1. 单一职责 - 只负责连接管理和数据转发
- * 2. 依赖注入 - 通过构造函数或配置对象注入依赖
+ * 2. 依赖注入 - 通过构造函数注入所有依赖
  * 3. 封装性 - 所有字段私有，通过方法访问
  * 4. 线程安全 - 使用 volatile 和同步机制
  *
  * @author NeoProxy Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 public final class ConnectionService {
 
@@ -42,17 +41,19 @@ public final class ConnectionService {
 
     private final MessageHandler messageHandler;
     private final LanguageData languageData;
+    private final CheckAliveTask checkAliveTask;
     private ConnectionConfig config;
     private String key;
     private int localPort = INVALID_LOCAL_PORT;
 
     public ConnectionService() {
-        this(new MinecraftMessageHandler());
+        this(new MinecraftMessageHandler(), new LanguageData());
     }
 
-    public ConnectionService(@NotNull MessageHandler messageHandler) {
+    public ConnectionService(@NotNull MessageHandler messageHandler, @NotNull LanguageData languageData) {
         this.messageHandler = messageHandler;
-        this.languageData = new LanguageData();
+        this.languageData = languageData;
+        this.checkAliveTask = new CheckAliveTask(this::getLastReceivedTime, this::sendHeartbeat, messageHandler);
     }
 
     public void start() {
@@ -66,16 +67,16 @@ public final class ConnectionService {
             this.key = validateAndNormalizeKey(externalKey);
             this.config = loadOrCreateConfig();
 
-            messageHandler.info(languageData.VERSION + VersionInfo.VERSION);
-            messageHandler.info("NeoLinkMC 客户端启动中...");
+            messageHandler.log(languageData.VERSION + NeoLinkMC.VERSION, MessageHandler.LogLevel.INFO);
+            messageHandler.send("NeoLinkMC 客户端启动中...", MessageHandler.MessageType.INFO);
 
             running = true;
             initialized = true;
             startConnectionThread();
 
         } catch (Exception e) {
-            messageHandler.error("连接服务启动失败", e);
-            messageHandler.sendError("服务启动失败：" + e.getMessage());
+            messageHandler.log("连接服务启动失败", MessageHandler.LogLevel.ERROR);
+            messageHandler.send("服务启动失败：" + e.getMessage(), MessageHandler.MessageType.ERROR);
         }
     }
 
@@ -83,15 +84,15 @@ public final class ConnectionService {
         if (!running) return;
         running = false;
         try {
-            CheckAliveTask.stop();
+            checkAliveTask.stop();
             closeQuietly(hookSocket);
             closeQuietly(connectingSocket);
             if (connectionThread != null && connectionThread.isAlive()) {
                 connectionThread.interrupt();
             }
-            messageHandler.info(languageData.SERVICE_STOPPED);
+            messageHandler.send(languageData.SERVICE_STOPPED, MessageHandler.MessageType.INFO);
         } catch (Exception e) {
-            messageHandler.error("停止连接服务出错", e);
+            messageHandler.log("停止连接服务出错", MessageHandler.LogLevel.ERROR);
         } finally {
             initialized = false;
         }
@@ -111,8 +112,25 @@ public final class ConnectionService {
         if (localPort > 0) {
             return localPort;
         }
-        // 如果 config 为 null 或尚未初始化，返回默认值 25565
         return config != null ? config.getLocalPort() : 25565;
+    }
+
+    public long getLastReceivedTime() {
+        return lastReceivedTime;
+    }
+
+    public boolean isHookSocketAvailable() {
+        return hookSocket != null && hookSocket.isConnected();
+    }
+
+    public Object getHookSocketLock() {
+        return this;
+    }
+
+    public void sendHeartbeat() throws IOException {
+        if (hookSocket != null) {
+            hookSocket.sendStr("PING");
+        }
     }
 
     private void startConnectionThread() {
@@ -120,7 +138,7 @@ public final class ConnectionService {
             try {
                 connectToNeoServer();
                 exchangeClientInfoWithServer();
-                CheckAliveTask.start(this);
+                checkAliveTask.start();
                 listenForServerCommands();
             } catch (Exception e) {
                 if (running) handleConnectionFailure(e);
@@ -131,38 +149,36 @@ public final class ConnectionService {
     }
 
     private void connectToNeoServer() throws IOException {
-        // 安全检查：确保配置已初始化
         if (config == null) {
             throw new IOException("配置未初始化，无法连接到服务器");
         }
-        messageHandler.info(languageData.CONNECT_TO + config.getRemoteDomain() + languageData.OMITTED);
+        messageHandler.send(languageData.CONNECT_TO + config.getRemoteDomain() + languageData.OMITTED, MessageHandler.MessageType.INFO);
         hookSocket = new SecureSocket(config.getRemoteDomain(), config.getHookPort());
     }
 
     private void exchangeClientInfoWithServer() throws IOException {
-        String clientInfo = "zh;" + VersionInfo.VERSION + ";" + key + ";T";
-        messageHandler.info("正在发送客户端信息到服务器...");
-        messageHandler.debug("客户端信息格式: zh;版本;密钥;T");
-        messageHandler.debug("实际发送内容: " + clientInfo.replace(key, "[密钥隐藏]"));
+        String clientInfo = "zh;" + NeoLinkMC.VERSION + ";" + key + ";T";
+        messageHandler.send("正在发送客户端信息到服务器...", MessageHandler.MessageType.INFO);
+        messageHandler.log("客户端信息: " + clientInfo.replace(key, "[密钥隐藏]"), MessageHandler.LogLevel.DEBUG);
         sendStr(clientInfo);
 
-        messageHandler.info("等待服务器响应...");
+        messageHandler.send("等待服务器响应...", MessageHandler.MessageType.INFO);
         String serverResponse = receiveStr();
-        messageHandler.info("服务器响应: " + serverResponse);
+        messageHandler.send("服务器响应: " + serverResponse, MessageHandler.MessageType.INFO);
 
         if (serverResponse == null) {
-            messageHandler.error("服务器返回空响应，连接被拒绝");
+            messageHandler.log("服务器返回空响应，连接被拒绝", MessageHandler.LogLevel.ERROR);
             throw new IOException("服务器返回空响应");
         }
 
         if (isErrorResponse(serverResponse)) {
-            messageHandler.error("服务器拒绝连接: " + serverResponse);
-            messageHandler.sendError(serverResponse);
+            messageHandler.log("服务器拒绝连接: " + serverResponse, MessageHandler.LogLevel.ERROR);
+            messageHandler.send(serverResponse, MessageHandler.MessageType.ERROR);
             exitAndFreeze(0);
         } else {
             lastReceivedTime = System.currentTimeMillis();
-            messageHandler.info("[服务端] " + serverResponse);
-            messageHandler.sendSuccess(serverResponse);
+            messageHandler.send("[服务端] " + serverResponse, MessageHandler.MessageType.INFO);
+            messageHandler.send(serverResponse, MessageHandler.MessageType.SUCCESS);
         }
     }
 
@@ -179,11 +195,9 @@ public final class ConnectionService {
             if (message.startsWith(":>")) {
                 handleServerCommand(message.substring(2));
             } else if (message.contains("消耗") || message.contains("流量")) {
-                messageHandler.warn("[服务器通告] " + message);
-                messageHandler.sendWarning(message);
+                messageHandler.send("[服务器通告] " + message, MessageHandler.MessageType.WARNING);
             } else {
-                messageHandler.info("[服务器消息] " + message);
-                messageHandler.sendMessage(message);
+                messageHandler.send("[服务器消息] " + message, MessageHandler.MessageType.INFO);
             }
         }
         throw new IOException("Connection closed.");
@@ -194,34 +208,30 @@ public final class ConnectionService {
         switch (parts[0]) {
             case "sendSocketTCP" -> ThreadManager.runAsync(() -> createNewTCPConnection(parts[1], parts[2]));
             case "exitNoFlow" -> {
-                messageHandler.info(languageData.NO_FLOW_LEFT);
-                messageHandler.sendError(languageData.NO_FLOW_LEFT);
+                messageHandler.send(languageData.NO_FLOW_LEFT, MessageHandler.MessageType.ERROR);
                 exitAndFreeze(0);
             }
+            case "exitKey" -> {
+                messageHandler.send("密钥验证失败，连接被拒绝", MessageHandler.MessageType.ERROR);
+                exitAndFreeze(0);
+            }
+            default -> messageHandler.log("未知服务器命令: " + parts[0], MessageHandler.LogLevel.WARN);
         }
     }
 
     private void handleConnectionFailure(Exception e) {
-        messageHandler.error("连接失败，详细异常信息:", e);
-        messageHandler.error("异常类型: " + e.getClass().getName());
-        messageHandler.error("异常消息: " + e.getMessage());
-        if (e.getCause() != null) {
-            messageHandler.error("异常原因: " + e.getCause().getMessage());
-        }
+        messageHandler.log("连接失败: " + e.getMessage(), MessageHandler.LogLevel.ERROR);
 
-        CheckAliveTask.stop();
-        // 安全获取远程域名，如果 config 为 null 则使用默认值
+        checkAliveTask.stop();
         String remoteDomain = config != null ? config.getRemoteDomain() : "p.ceroxe.fun";
-        messageHandler.info(languageData.FAIL_TO_BUILD_A_CHANNEL_FROM + remoteDomain);
-        messageHandler.sendError(languageData.FAIL_TO_BUILD_A_CHANNEL_FROM + remoteDomain);
+        messageHandler.send(languageData.FAIL_TO_BUILD_A_CHANNEL_FROM + remoteDomain, MessageHandler.MessageType.ERROR);
 
-        exitAndFreeze(-1, e);
+        exitAndFreeze(-1);
     }
 
     public void createNewTCPConnection(String socketID, String remoteAddress) {
-        // 安全检查：确保配置已初始化
         if (config == null) {
-            messageHandler.error("配置未初始化，无法创建 TCP 连接");
+            messageHandler.log("配置未初始化，无法创建 TCP 连接", MessageHandler.LogLevel.ERROR);
             return;
         }
 
@@ -233,23 +243,20 @@ public final class ConnectionService {
             neoTransferSocket = new SecureSocket(config.getRemoteDomain(), config.getConnectPort());
             neoTransferSocket.sendStr("TCP;" + socketID);
 
-            // 输出连接建立信息到日志
-            messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
-                    config.getLocalDomain() + ":" + effectiveLocalPort + languageData.BUILD_UP);
+            messageHandler.send(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
+                    config.getLocalDomain() + ":" + effectiveLocalPort + languageData.BUILD_UP, MessageHandler.MessageType.INFO);
 
-            // enableProxyProtocol 硬编码为 false，PPv2 头会被剥离不传给 Minecraft
             TCPTransformer serverToNeoTask = new TCPTransformer(neoTransferSocket, localServerSocket, false);
             TCPTransformer neoToServerTask = new TCPTransformer(localServerSocket, neoTransferSocket, false);
             ThreadManager manager = new ThreadManager(serverToNeoTask, neoToServerTask);
 
             manager.startAsyncWithCallback(result -> {
-                // 输出连接断开信息到日志
-                messageHandler.info(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
-                        config.getLocalDomain() + ":" + effectiveLocalPort + languageData.DESTROY);
+                messageHandler.send(languageData.A_TCP_CONNECTION + remoteAddress + " -> " +
+                        config.getLocalDomain() + ":" + effectiveLocalPort + languageData.DESTROY, MessageHandler.MessageType.INFO);
                 manager.close();
             });
         } catch (Exception e) {
-            messageHandler.info(languageData.FAIL_TO_CONNECT_LOCALHOST + config.getLocalDomain() + ":" + getLocalPort());
+            messageHandler.send(languageData.FAIL_TO_CONNECT_LOCALHOST + config.getLocalDomain() + ":" + getLocalPort(), MessageHandler.MessageType.ERROR);
             closeQuietly(localServerSocket);
             closeQuietly(neoTransferSocket);
         }
@@ -286,126 +293,23 @@ public final class ConnectionService {
     }
 
     private void exitAndFreeze(int exitCode) {
-        exitAndFreeze(exitCode, null);
-    }
-
-    private void exitAndFreeze(int exitCode, @Nullable Exception cause) {
-        if (cause != null) {
-            messageHandler.error("致命错误，服务停止。异常详情:", cause);
-        }
         stop();
-        messageHandler.sendError("内网穿透服务已由于致命错误停止。");
+        messageHandler.send("内网穿透服务已停止", MessageHandler.MessageType.ERROR);
     }
 
-    private String validateAndNormalizeKey(@Nullable String externalKey) {
-        if (externalKey != null && !externalKey.trim().isEmpty()) {
-            messageHandler.debug("使用外部传入的密钥");
-            return externalKey.trim();
-        }
-        messageHandler.sendWarning("未配置密钥，使用默认密钥");
-        return DEFAULT_KEY;
+    private String validateAndNormalizeKey(String key) {
+        return (key == null || key.trim().isEmpty()) ? DEFAULT_KEY : key.trim();
+    }
+
+    private ConnectionConfig loadOrCreateConfig() {
+        return ConnectionConfig.builder().build();
     }
 
     private boolean isErrorResponse(String response) {
-        return response.contains("exit") || response.contains("退") || response.contains("错误")
-                || response.contains("denied") || response.contains("already")
-                || response.contains("过期") || response.contains("错")
-                || response.contains("密钥");
-    }
-
-    /**
-     * 加载或创建配置
-     * 与老代码 applyConfig() 逻辑一致：优先使用已设置的值，只有在未设置时才从配置读取
-     */
-    private ConnectionConfig loadOrCreateConfig() {
-        // 先加载配置文件（只加载一次）
-        neoproxy.neolinkmc.config.ConfigManager.loadConfig();
-
-        // 与老代码 applyConfig() 逻辑一致：优先使用已设置的值，只有在未设置时才从配置读取
-        String remoteDomain = getStringFromConfig("remote_domain", "p.ceroxe.fun");
-        String localDomain = getStringFromConfig("local_domain", "localhost");
-        int hookPort = getIntFromConfig("host_hook_port", 44801);
-        int connectPort = getIntFromConfig("host_connect_port", 44802);
-        int configLocalPort = getIntFromConfig("local_port", 25565);
-
-        // 优先使用外部设置的端口（与老代码逻辑一致）
-        int effectiveLocalPort = localPort > 0 ? localPort : configLocalPort;
-
-        return ConnectionConfig.builder()
-                .remoteDomain(remoteDomain)
-                .localDomain(localDomain)
-                .hookPort(hookPort)
-                .connectPort(connectPort)
-                .localPort(effectiveLocalPort)
-                .build();
-    }
-
-    /**
-     * 从已加载的配置中获取字符串值
-     */
-    private String getStringFromConfig(String key, String defaultValue) {
-        try {
-            return neoproxy.neolinkmc.config.ConfigManager.getString(key, defaultValue);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * 从已加载的配置中获取整数值
-     * 与老代码一致：配置文件中端口存储为字符串，需要解析
-     */
-    private int getIntFromConfig(String key, int defaultValue) {
-        try {
-            String value = neoproxy.neolinkmc.config.ConfigManager.getString(key, String.valueOf(defaultValue));
-            return Integer.parseInt(value);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * 从已加载的配置中获取布尔值
-     */
-    private boolean getBooleanFromConfig(String key, boolean defaultValue) {
-        try {
-            return neoproxy.neolinkmc.config.ConfigManager.getBoolean(key, defaultValue);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    public String getRemoteDomain() {
-        return config != null ? config.getRemoteDomain() : "localhost";
-    }
-
-    public int getHookPort() {
-        return config != null ? config.getHookPort() : 44801;
-    }
-
-    public String getKey() {
-        return key;
-    }
-
-    public long getLastReceivedTime() {
-        return lastReceivedTime;
-    }
-
-    public void sendHeartbeat() throws IOException {
-        if (hookSocket != null) {
-            hookSocket.sendStr("PING");
-        }
-    }
-
-    public void closeHookSocket() {
-        closeQuietly(hookSocket);
-    }
-
-    public boolean isHookSocketAvailable() {
-        return hookSocket != null;
-    }
-
-    public Object getHookSocketLock() {
-        return hookSocket != null ? hookSocket : new Object();
+        String lower = response.toLowerCase();
+        return lower.contains("exit") || lower.contains("退") || lower.contains("错误")
+                || lower.contains("denied") || lower.contains("already")
+                || lower.contains("过期") || lower.contains("占")
+                || lower.contains("密钥错误");
     }
 }

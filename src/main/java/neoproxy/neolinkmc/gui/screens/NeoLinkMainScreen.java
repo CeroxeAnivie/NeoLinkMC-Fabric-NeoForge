@@ -53,7 +53,7 @@ public class NeoLinkMainScreen extends ModernUIScreen {
 
     public NeoLinkMainScreen(Screen lastScreen) {
         super(Component.literal("NeoLinkMC 配置"), lastScreen);
-        this.configContainer = new ConfigContainer.Standalone();
+        this.configContainer = new ConfigContainer();
         // 注意：配置加载移至 onCreateView，确保每次打开界面都读取最新配置
     }
 

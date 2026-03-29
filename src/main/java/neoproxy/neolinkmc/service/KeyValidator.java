@@ -2,7 +2,6 @@ package neoproxy.neolinkmc.service;
 
 import fun.ceroxe.api.net.SecureSocket;
 import neoproxy.neolinkmc.NeoLinkMC;
-import neoproxy.neolinkmc.util.VersionInfo;
 
 import java.io.IOException;
 
@@ -37,7 +36,7 @@ public class KeyValidator {
             SecureSocket hookSocket = new SecureSocket(remoteDomain, hookPort);
 
             // 直接硬编码 "zh" 语言标识发送给服务端
-            String clientInfo = "zh;" + VersionInfo.VERSION + ";" + finalKey + ";T";
+            String clientInfo = "zh;" + NeoLinkMC.VERSION + ";" + finalKey + ";T";
 
             NeoLinkMC.LOGGER.debug("[DEBUG] 发送鉴权信息...");
             hookSocket.sendStr(clientInfo);
