@@ -173,7 +173,8 @@ $RECYCLE.BIN/
 # ============================================
 # NeoLinkMC 运行时文件
 eula.txt
-config.json
+# 注意：只忽略运行时生成的 config.json，不忽略模板文件
+/config.json
 *.cache
 cache/
 
