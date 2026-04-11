@@ -14,8 +14,8 @@ val mod_version: String by project
 val maven_group: String by project
 val archives_base_name: String by project
 
-// 构建完整的版本号格式: 5.11.2+fabric.1.21
-val fullVersion = "${mod_version}+fabric.${minecraft_version.substringBefore('.')}.${minecraft_version.substringAfter('.').substringBefore('.')}"
+// 构建完整的版本号格式: 0.0.3+fabric.1.21-1.21.8
+val fullVersion = "${mod_version}+fabric.1.21-1.21.8"
 
 version = fullVersion
 group = maven_group
