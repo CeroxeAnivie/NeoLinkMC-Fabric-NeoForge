@@ -1,8 +1,7 @@
 plugins {
-    id("fabric-loom") version "1.11-SNAPSHOT"
+    id("net.fabricmc.fabric-loom") version "1.15-SNAPSHOT"
     id("maven-publish")
     java
-    kotlin("jvm") version "2.1.0"
 }
 
 // 获取属性文件中的版本信息
@@ -14,8 +13,8 @@ val mod_version: String by project
 val maven_group: String by project
 val archives_base_name: String by project
 
-// 构建完整的版本号格式: 0.0.3+fabric.1.21-1.21.8
-val fullVersion = "${mod_version}+fabric.1.21-1.21.8"
+// 构建完整的版本号格式: 0.0.3+fabric.26.1
+val fullVersion = "${mod_version}+fabric.${minecraft_version}"
 
 version = fullVersion
 group = maven_group
@@ -36,13 +35,12 @@ repositories {
 }
 
 dependencies {
-    // Minecraft 和 Fabric 核心依赖
+    // Minecraft 和 Fabric 核心依赖 - 26.1 未混淆版本使用 implementation
     minecraft("com.mojang:minecraft:$minecraft_version")
-    mappings(loom.officialMojangMappings())
-    modImplementation("net.fabricmc:fabric-loader:$loader_version")
+    implementation("net.fabricmc:fabric-loader:$loader_version")
 
     // Fabric API
-    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_version")
+    implementation("net.fabricmc.fabric-api:fabric-api:$fabric_version")
 
     // 原有项目依赖 - 使用include打包到mod中
     implementation("fun.ceroxe.api:ceroxe-core:0.2.7")
@@ -51,21 +49,17 @@ dependencies {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
     withSourcesJar()
 }
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    options.release.set(21)
+    options.release.set(25)
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-    }
-}
+
 
 tasks.processResources {
     inputs.property("version", project.version)

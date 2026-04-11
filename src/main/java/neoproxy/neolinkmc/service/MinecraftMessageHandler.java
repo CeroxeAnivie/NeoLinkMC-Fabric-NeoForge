@@ -61,7 +61,8 @@ public final class MinecraftMessageHandler implements MessageHandler {
             if (client != null) {
                 client.execute(() -> {
                     if (client.player != null) {
-                        client.player.displayClientMessage(Component.literal(message), false);
+                        // 26.1 使用 sendSystemMessage 代替 displayClientMessage
+                        client.player.sendSystemMessage(Component.literal(message));
                     }
                 });
             }

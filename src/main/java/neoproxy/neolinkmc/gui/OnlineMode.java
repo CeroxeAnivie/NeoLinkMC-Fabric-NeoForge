@@ -3,7 +3,7 @@ package neoproxy.neolinkmc.gui;
 import net.minecraft.network.chat.Component;
 
 /**
- * 在线模式枚举
+ * 在线模式枚举 - 26.1 版本
  * 合并正版验证和UUID修复为一个三态选项
  * 与 LanServerProperties 保持一致
  *
@@ -39,21 +39,28 @@ public enum OnlineMode {
      */
     public final boolean tryOnlineUUIDFirst;
 
-    /**
-     * 状态名称（用于显示）
-     */
-    public final Component stateName;
-
-    /**
-     * 提示文本
-     */
-    public final Component tooltip;
+    private final Component displayName;
+    private final Component toolTip;
 
     OnlineMode(boolean onlineModeEnabled, boolean tryOnlineUUIDFirst, String key) {
         this.onlineModeEnabled = onlineModeEnabled;
         this.tryOnlineUUIDFirst = tryOnlineUUIDFirst;
-        this.stateName = Component.translatable(TRANSLATION_KEY + "." + key);
-        this.tooltip = Component.translatable(TRANSLATION_KEY + "." + key + ".tooltip");
+        this.displayName = Component.translatable(TRANSLATION_KEY + "." + key);
+        this.toolTip = Component.translatable(TRANSLATION_KEY + "." + key + ".tooltip");
+    }
+
+    /**
+     * 获取显示名称 - 兼容 26.1 API
+     */
+    public Component getDisplayName() {
+        return this.displayName;
+    }
+
+    /**
+     * 获取提示文本 - 兼容 26.1 API
+     */
+    public Component gettoolTip() {
+        return this.toolTip;
     }
 
     /**

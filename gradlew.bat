@@ -26,6 +26,9 @@
 @rem Set local scope for the variables with windows NT shell
 if "%OS%"=="Windows_NT" setlocal
 
+@rem 26.1分支专用 - 强制使用 Java 25
+set JAVA_HOME=C:\Program Files\Java\graalvm-jdk-25.0.1+8.1
+
 @rem 设置UTF-8编码防止中文乱码
 chcp 65001 >nul 2>&1
 
@@ -85,7 +88,7 @@ if %ERRORLEVEL% equ 0 goto mainEnd
 
 :fail
 rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
-rem the _cmd.exe /c_ return code!
+rem the _cmd.exe /c" return code!
 set EXIT_CODE=%ERRORLEVEL%
 if %EXIT_CODE% equ 0 set EXIT_CODE=1
 if not ""=="%GRADLE_EXIT_CONSOLE%" exit %EXIT_CODE%

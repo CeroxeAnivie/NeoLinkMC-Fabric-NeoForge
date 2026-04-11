@@ -4,6 +4,7 @@ import neoproxy.neolinkmc.config.NeoLinkConfig;
 import neoproxy.neolinkmc.util.UUIDFixer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.gamerules.GameRules;
 
 /**
  * 配置容器类 - 管理GUI配置状态
@@ -57,7 +58,8 @@ public final class ConfigContainer {
         server.setDefaultGameType(this.gameType);
         server.getPlayerList().setAllowCommandsForAllPlayers(this.allowCheats);
         server.setUsesAuthentication(this.onlineMode.onlineModeEnabled);
-        server.setPvpAllowed(this.pvpAllowed);
+        // 26.1 使用 GameRules 设置 PvP
+        server.getGameRules().set(GameRules.PVP, this.pvpAllowed, server);
         UUIDFixer.tryOnlineFirst = this.onlineMode.tryOnlineUUIDFirst;
     }
 
