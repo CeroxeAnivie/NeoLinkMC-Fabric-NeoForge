@@ -3,8 +3,12 @@ package neoproxy.neolinkmc.gui;
 import neoproxy.neolinkmc.config.NeoLinkConfig;
 import neoproxy.neolinkmc.util.UUIDFixer;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.gamerules.GameRules;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /**
  * 配置容器类 - 管理GUI配置状态
@@ -56,11 +60,22 @@ public final class ConfigContainer {
      */
     public void applyToCurrentServer(IntegratedServer server) {
         server.setDefaultGameType(this.gameType);
-        server.getPlayerList().setAllowCommandsForAllPlayers(this.allowCheats);
+        applyAllowCheats(server.getPlayerList(), this.allowCheats);
         server.setUsesAuthentication(this.onlineMode.onlineModeEnabled);
         // 26.1 使用 GameRules 设置 PvP
         server.getGameRules().set(GameRules.PVP, this.pvpAllowed, server);
         UUIDFixer.tryOnlineFirst = this.onlineMode.tryOnlineUUIDFirst;
+    }
+
+    private static void applyAllowCheats(PlayerList playerList, boolean allowCheats) {
+        try {
+            Method method = PlayerList.class.getMethod("setAllowCommandsForAllPlayers", boolean.class);
+            method.invoke(playerList, allowCheats);
+        } catch (NoSuchMethodException ignored) {
+            // Older Minecraft versions do not expose this runtime mutator.
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to apply allow-cheats setting.", e);
+        }
     }
 
     /**

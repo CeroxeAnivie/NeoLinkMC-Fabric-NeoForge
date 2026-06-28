@@ -3,7 +3,12 @@ package neoproxy.neolinkmc.gui;
 import neoproxy.neolinkmc.config.NeoLinkConfig;
 import neoproxy.neolinkmc.util.UUIDFixer;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.GameType;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /**
  * 配置容器类 - 管理GUI配置状态
@@ -55,10 +60,71 @@ public final class ConfigContainer {
      */
     public void applyToCurrentServer(IntegratedServer server) {
         server.setDefaultGameType(this.gameType);
-        server.getPlayerList().setAllowCommandsForAllPlayers(this.allowCheats);
+        applyAllowCheats(server.getPlayerList(), this.allowCheats);
         server.setUsesAuthentication(this.onlineMode.onlineModeEnabled);
-        server.setPvpAllowed(this.pvpAllowed);
+        applyPvpAllowed(server, this.pvpAllowed);
         UUIDFixer.tryOnlineFirst = this.onlineMode.tryOnlineUUIDFirst;
+    }
+
+    private static void applyAllowCheats(PlayerList playerList, boolean allowCheats) {
+        try {
+            Method method = PlayerList.class.getMethod("setAllowCommandsForAllPlayers", boolean.class);
+            method.invoke(playerList, allowCheats);
+        } catch (NoSuchMethodException ignored) {
+            // Minecraft 1.20.x does not expose this runtime mutator. The value is
+            // still persisted and used by versions whose server API supports it.
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to apply allow-cheats setting.", e);
+        }
+    }
+
+    private static void applyPvpAllowed(IntegratedServer server, boolean pvpAllowed) {
+        try {
+            Method method = IntegratedServer.class.getMethod("setPvpAllowed", boolean.class);
+            method.invoke(server, pvpAllowed);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Minecraft 1.21.9+ moved PvP to a game rule. Keep this path
+            // reflective so the shared 1.20-1.21 template still compiles.
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to apply PvP setting.", e);
+        }
+
+        try {
+            Class<?> gameRulesClass = Class.forName("net.minecraft.world.level.gamerules.GameRules");
+            Field pvpField = gameRulesClass.getField("PVP");
+            Object pvpRuleKey = pvpField.get(null);
+            Object gameRules = invokeNoArgMethod(server, "getGameRules");
+            for (Method method : gameRules.getClass().getMethods()) {
+                if (isGameRuleSetMethod(method, pvpRuleKey, server)) {
+                    method.invoke(gameRules, pvpRuleKey, pvpAllowed, server);
+                    return;
+                }
+            }
+            throw new NoSuchMethodException("No compatible GameRules#set method found.");
+        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException ignored) {
+            // Older versions do not expose the PvP game rule. The saved value
+            // remains available and versions with a runtime mutator apply it.
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to apply PvP game rule.", e);
+        }
+    }
+
+    private static boolean isGameRuleSetMethod(Method method, Object pvpRuleKey, IntegratedServer server) {
+        if (!method.getName().equals("set")) {
+            return false;
+        }
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        return parameterTypes.length == 3
+                && parameterTypes[0].isAssignableFrom(pvpRuleKey.getClass())
+                && parameterTypes[1] == boolean.class
+                && parameterTypes[2].isAssignableFrom(server.getClass());
+    }
+
+    private static Object invokeNoArgMethod(Object target, String methodName)
+            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Method method = target.getClass().getMethod(methodName);
+        return method.invoke(target);
     }
 
     /**

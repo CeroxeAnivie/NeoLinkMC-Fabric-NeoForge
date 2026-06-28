@@ -71,7 +71,7 @@ public class NeoLinkConfigScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        Positions layout = LanScreenLayout.calculate(this.width, this.height);
+        Positions layout = LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth());
 
         addCenteredStringWidget(TUNNEL_SETTINGS, layout.centerX(), layout.titleY());
         addCenteredStringWidget(PLAYER_SETTINGS, layout.centerX(), layout.playerSettingsY());
@@ -109,7 +109,8 @@ public class NeoLinkConfigScreen extends Screen {
     private Button createButton(int x, int y, Component message, Consumer<Button> onPress) {
         return Button.builder(message, onPress::accept)
                 .pos(x, y)
-                .size(LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT)
+                .size(LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth()).buttonWidth(),
+                        LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth()).buttonHeight())
                 .build();
     }
 
@@ -129,7 +130,8 @@ public class NeoLinkConfigScreen extends Screen {
         EditBox editBox = new EditBox(
                 this.font,
                 x, y,
-                LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth()).inputWidth(),
+                LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth()).buttonHeight(),
                 Component.literal("")
         );
         editBox.setValue(initial);
@@ -152,6 +154,19 @@ public class NeoLinkConfigScreen extends Screen {
     }
 
     // ==================== 按钮文本生成 ====================
+
+    private int preferredButtonTextWidth() {
+        int maxWidth = 0;
+        maxWidth = Math.max(maxWidth, this.font.width(ADVANCED_SETTINGS));
+        maxWidth = Math.max(maxWidth, this.font.width(OPEN_CONFIG_FOLDER));
+        maxWidth = Math.max(maxWidth, this.font.width(getGameModeDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getOnlineModeDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getAllowCheatsDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getAllowPvpDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(START_TUNNEL));
+        maxWidth = Math.max(maxWidth, this.font.width(CANCEL));
+        return maxWidth;
+    }
 
     private Component getGameModeDisplayText() {
         String modeName = switch (this.config.gameType) {

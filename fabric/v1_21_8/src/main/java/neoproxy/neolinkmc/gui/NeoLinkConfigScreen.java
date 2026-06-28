@@ -89,7 +89,7 @@ public class NeoLinkConfigScreen extends Screen {
     protected void init() {
         super.init();
 
-        Positions layout = LanScreenLayout.calculate(this.width, this.height);
+        Positions layout = LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth());
 
         // 保存Y坐标供render使用
         this.titleY = layout.titleY();
@@ -98,11 +98,11 @@ public class NeoLinkConfigScreen extends Screen {
 
         // ==================== 第一行：顶部按钮 ====================
         this.advancedSettingsButton = addRenderableWidget(
-                createButton(layout.leftColumnX(), layout.topRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.topRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         ADVANCED_SETTINGS, this::onAdvancedSettingsClick)
         );
         this.openConfigFolderButton = addRenderableWidget(
-                createButton(layout.rightColumnX(), layout.topRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.topRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         OPEN_CONFIG_FOLDER, this::onOpenConfigFolderClick)
         );
 
@@ -110,43 +110,43 @@ public class NeoLinkConfigScreen extends Screen {
 
         // ==================== 第四行：游戏设置按钮网格 ====================
         this.gameModeButton = addRenderableWidget(
-                createButton(layout.leftColumnX(), layout.firstOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.firstOptionRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         getGameModeDisplayText(), this::onGameModeClick)
         );
         this.onlineModeButton = addRenderableWidget(
-                createButton(layout.rightColumnX(), layout.firstOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.firstOptionRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         getOnlineModeDisplayText(), this::onOnlineModeClick)
         );
 
         this.allowCheatsButton = addRenderableWidget(
-                createButton(layout.leftColumnX(), layout.secondOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.secondOptionRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         getAllowCheatsDisplayText(), this::onAllowCheatsClick)
         );
         this.allowPvpButton = addRenderableWidget(
-                createButton(layout.rightColumnX(), layout.secondOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.secondOptionRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         getAllowPvpDisplayText(), this::onAllowPvpClick)
         );
 
         // ==================== 第五/六行：输入框标签和输入框 ====================
 
         this.portEditBox = addRenderableWidget(
-                createFilteredEditBox(layout.leftColumnX(), layout.inputRowY(), LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createFilteredEditBox(layout.leftColumnX(), layout.inputRowY(), layout.inputWidth(), layout.buttonHeight(),
                         String.valueOf(this.config.localPort),
                         this::isValidPortInput, 5)
         );
         this.maxPlayersEditBox = addRenderableWidget(
-                createFilteredEditBox(layout.rightColumnX(), layout.inputRowY(), LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createFilteredEditBox(layout.rightColumnX(), layout.inputRowY(), layout.inputWidth(), layout.buttonHeight(),
                         String.valueOf(this.config.maxPlayers),
                         this::isValidMaxPlayersInput, 3)
         );
 
         // ==================== 第七行：底部按钮 ====================
         this.startTunnelButton = addRenderableWidget(
-                createButton(layout.leftColumnX(), layout.bottomRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.bottomRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         START_TUNNEL, this::onStartTunnelClick)
         );
         this.cancelButton = addRenderableWidget(
-                createButton(layout.rightColumnX(), layout.bottomRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.bottomRowY(), layout.buttonWidth(), layout.buttonHeight(),
                         CANCEL, this::onCancelClick)
         );
     }
@@ -157,7 +157,7 @@ public class NeoLinkConfigScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         // 然后在背景之上绘制自定义文本
-        Positions layout = LanScreenLayout.calculate(this.width, this.height);
+        Positions layout = LanScreenLayout.calculate(this.width, this.height, preferredButtonTextWidth());
 
         // 渲染标题 - 使用init中动态计算的Y坐标
         drawCenteredString(guiGraphics, TUNNEL_SETTINGS, layout.centerX(), this.titleY, 0xFFFFFFFF);
@@ -208,6 +208,19 @@ public class NeoLinkConfigScreen extends Screen {
 
     private void drawString(GuiGraphics guiGraphics, Component text, int x, int y, int color) {
         guiGraphics.drawString(this.font, text, x, y, color, true);
+    }
+
+    private int preferredButtonTextWidth() {
+        int maxWidth = 0;
+        maxWidth = Math.max(maxWidth, this.font.width(ADVANCED_SETTINGS));
+        maxWidth = Math.max(maxWidth, this.font.width(OPEN_CONFIG_FOLDER));
+        maxWidth = Math.max(maxWidth, this.font.width(getGameModeDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getOnlineModeDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getAllowCheatsDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(getAllowPvpDisplayText()));
+        maxWidth = Math.max(maxWidth, this.font.width(START_TUNNEL));
+        maxWidth = Math.max(maxWidth, this.font.width(CANCEL));
+        return maxWidth;
     }
 
     // ==================== 按钮文本生成 ====================

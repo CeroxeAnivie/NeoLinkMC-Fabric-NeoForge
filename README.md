@@ -1,18 +1,29 @@
 # NeoLinkMC
 
-Minecraft Fabric 内网穿透 Mod，用于在单人世界的“对局域网开放”流程中启动 NeoLink 隧道，让本地 LAN 服务可以通过公网节点访问。
+Minecraft 内网穿透 Mod，用于在单人世界的“对局域网开放”流程中启动 NeoLink 隧道，让本地 LAN 服务可以通过公网节点访问。
 
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.8%20%7C%2026.1-green?style=flat-square&logo=minecraft)](https://minecraft.net)
-[![Java](https://img.shields.io/badge/Java-21%2B%20%7C%2025%2B-orange?style=flat-square&logo=openjdk&logoColor=white)](https://adoptium.net)
-[![Fabric](https://img.shields.io/badge/Fabric-Loom%201.17.12-blue?style=flat-square)](https://fabricmc.net)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.20--1.21.11%20%7C%2026.1-green?style=flat-square&logo=minecraft)](https://minecraft.net)
+[![Java](https://img.shields.io/badge/Java-17%20%7C%2021%20%7C%2025-orange?style=flat-square&logo=openjdk&logoColor=white)](https://adoptium.net)
+[![Fabric](https://img.shields.io/badge/Fabric-supported-blue?style=flat-square)](https://fabricmc.net)
+[![Forge](https://img.shields.io/badge/Forge-supported-orange?style=flat-square)](https://files.minecraftforge.net)
+[![NeoForge](https://img.shields.io/badge/NeoForge-supported-red?style=flat-square)](https://neoforged.net)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 ## 支持版本
 
-| 模块 | Minecraft | Java | Fabric Loader | Fabric API |
-|------|-----------|------|---------------|------------|
-| `fabric:v1_21_8` | `>=1.21 <=1.21.8` | 21+ | `0.16.14` | `0.134.0+1.21.8` |
-| `fabric:v26_1` | `26.1` | 25+ | `0.18.5` | `0.144.0+26.1` |
+| Loader | Minecraft | Java | 说明 |
+|--------|-----------|------|------|
+| Fabric | `1.20` - `1.21.11`, `26.1` | 21 / 25 | `26.1` 使用 Java 25，其余模块使用 Java 21 |
+| Forge | `1.20` - `1.20.4`, `1.20.6`, `1.21`, `1.21.1`, `1.21.3` - `1.21.10` | 17 / 21 | `1.20` - `1.20.4` 以 Java 17 release 编译，其余模块使用 Java 21 |
+| NeoForge | `1.20.4`, `1.20.6`, `1.21` - `1.21.6`, `1.21.8` - `1.21.11`, `26.1` | 21 / 25 | `26.1` 使用 Java 25，其余模块使用 Java 21 |
+
+已跳过的不可用或异常版本：
+
+| Loader | Minecraft | 原因 |
+|--------|-----------|------|
+| Forge | `1.20.5`, `1.21.2`, `1.21.11`, `26.1` | 当前 ForgeGradle/Forge 坐标不可用或生成 mapped artifact 失败 |
+| NeoForge | `1.20.2`, `1.20.3`, `1.20.5` | Maven artifact 缺少当前 ModDevGradle 需要的 `.module` capability |
+| NeoForge | `1.21.7` | `createMinecraftArtifacts` 在当前 NeoForge beta 坐标下长时间无产物 |
 
 ## 功能
 
@@ -26,11 +37,12 @@ Minecraft Fabric 内网穿透 Mod，用于在单人世界的“对局域网开�
 
 ## 安装
 
-1. 安装对应 Minecraft 版本的 Fabric Loader。
-2. 安装对应版本的 Fabric API。
-3. 从 Releases 下载对应版本的 NeoLinkMC Fabric jar。
-4. 将 jar 放入 `.minecraft/mods/`。
-5. 进入单人世界，按 Esc，点击“对局域网开放”。
+1. 安装目标 Minecraft 版本对应的 Fabric、Forge 或 NeoForge。
+2. 从 Releases 下载对应 Loader 和 Minecraft 版本的 NeoLinkMC jar。
+3. 将 jar 放入 `.minecraft/mods/`。
+4. 进入单人世界，按 Esc，点击“对局域网开放”。
+
+Fabric 版本还需要安装对应 Minecraft 版本的 Fabric API。
 
 ## 配置
 
@@ -61,18 +73,22 @@ Minecraft Fabric 内网穿透 Mod，用于在单人世界的“对局域网开�
 
 ## 构建
 
-使用项目内 Gradle Wrapper 构建：
+使用项目内 Gradle Wrapper 构建。建议优先执行目标模块的 `jar` 任务，避免对所有 Minecraft 版本触发不必要的检查和首次 artifact 生成。
 
 ```cmd
-gradlew.bat :fabric:v1_21_8:build
-gradlew.bat :fabric:v26_1:build
+gradlew.bat :fabric:v1_21_8:jar
+gradlew.bat :forge:v1_21_8:jar
+gradlew.bat :neoforge:v1_21_8:jar
 ```
+
+首次构建 Forge/NeoForge 版本时，Gradle 插件会下载 Minecraft client/server jar，并生成 mappings、sources 和 userdev artifacts；这个阶段可能需要数分钟。缓存命中后，同一模块通常会回到秒级构建。
 
 输出位置：
 
 ```text
-fabric/v1_21_8/build/libs/
-fabric/v26_1/build/libs/
+fabric/<module>/build/libs/
+forge/<module>/build/libs/
+neoforge/<module>/build/libs/
 ```
 
 ## 许可
