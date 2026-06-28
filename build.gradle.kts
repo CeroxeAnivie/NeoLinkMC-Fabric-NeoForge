@@ -1,107 +1,196 @@
+buildscript {
+    repositories {
+        maven("https://maven.fabricmc.net/") {
+            name = "Fabric"
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath("net.fabricmc:fabric-loom:1.17.12")
+    }
+}
+
 plugins {
-    id("net.fabricmc.fabric-loom") version "1.15-SNAPSHOT"
+    base
     id("maven-publish")
-    java
 }
 
-// 获取属性文件中的版本信息
-val minecraft_version: String by project
-val yarn_mappings: String by project
-val loader_version: String by project
-val fabric_version: String by project
-val mod_version: String by project
-val maven_group: String by project
-val archives_base_name: String by project
+group = property("maven_group").toString()
+version = property("mod_version").toString()
 
-// 构建完整的版本号格式: 0.0.3+fabric.26.1
-val fullVersion = "${mod_version}+fabric.${minecraft_version}"
+val neoLinkApiVersion = property("neolinkapi_version").toString()
+val jetbrainsAnnotationsVersion = "26.0.2"
+val requestedTasks = gradle.startParameter.taskNames
 
-version = fullVersion
-group = maven_group
-
-base {
-    // 设置 JAR 基础名称，最终格式: NeoLinkMC-5.11.2+fabric.1.21.jar
-    archivesName.set(archives_base_name)
-}
-
-repositories {
-    mavenCentral()
-    maven("https://maven.fabricmc.net/") {
-        name = "Fabric"
+fun shouldConfigureFabricModule(projectPath: String): Boolean {
+    if (requestedTasks.isEmpty()) {
+        return true
     }
-    maven("https://jitpack.io") {
-        name = "JitPack"
+
+    val requestedProjectPaths = requestedTasks
+        .filter { it.startsWith(":fabric:") }
+        .map { taskName ->
+            taskName.split(":")
+                .take(3)
+                .joinToString(":")
+        }
+        .toSet()
+
+    return requestedProjectPaths.isEmpty() || projectPath in requestedProjectPaths
+}
+
+subprojects {
+    apply(plugin = "java")
+
+    group = rootProject.group
+    version = rootProject.version
+
+    extensions.configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+        withSourcesJar()
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+        options.encoding = "UTF-8"
+        options.release.set(21)
+    }
+
+    tasks.withType<ProcessResources>().configureEach {
+        filteringCharset = "UTF-8"
     }
 }
 
-dependencies {
-    // Minecraft 和 Fabric 核心依赖 - 26.1 未混淆版本使用 implementation
-    minecraft("com.mojang:minecraft:$minecraft_version")
-    implementation("net.fabricmc:fabric-loader:$loader_version")
+project(":common") {
+    apply(plugin = "java-library")
 
-    // Fabric API
-    implementation("net.fabricmc.fabric-api:fabric-api:$fabric_version")
-
-    // 原有项目依赖 - 使用include打包到mod中
-    implementation("fun.ceroxe.api:ceroxe-core:0.2.7")
-    include("fun.ceroxe.api:ceroxe-core:0.2.7")
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+    dependencies {
+        "api"("top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion")
+        "compileOnly"("org.jetbrains:annotations:$jetbrainsAnnotationsVersion")
     }
-    withSourcesJar()
 }
 
-tasks.withType<JavaCompile> {
-    options.encoding = "UTF-8"
-    options.release.set(25)
+project(":fabric") {
+    tasks.named<Jar>("jar") {
+        enabled = false
+    }
 }
 
+fun Project.configureFabricModule(
+    minecraftVersion: String,
+    loaderVersion: String,
+    fabricVersion: String,
+    javaVersion: Int,
+    versionSuffix: String,
+    mappings: MinecraftMappings
+) {
+    apply(plugin = "fabric-loom")
+    apply(plugin = "maven-publish")
 
+    version = "${rootProject.version}+$versionSuffix"
 
-tasks.processResources {
-    inputs.property("version", project.version)
-    inputs.property("minecraft_version", minecraft_version)
-    inputs.property("loader_version", loader_version)
-    filteringCharset = "UTF-8"
+    extensions.configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(javaVersion))
+        }
+    }
 
-    filesMatching("fabric.mod.json") {
-        expand(
-            mapOf(
-                "version" to project.version,
-                "minecraft_version" to minecraft_version,
-                "loader_version" to loader_version,
-                "fabric_version" to fabric_version
-            )
+    tasks.withType<JavaCompile>().configureEach {
+        options.release.set(javaVersion)
+    }
+
+    val archivesBaseName = rootProject.property("archives_base_name").toString()
+
+    base {
+        archivesName.set("$archivesBaseName-Fabric-$minecraftVersion")
+    }
+
+    val loom = extensions.getByType<net.fabricmc.loom.api.LoomGradleExtensionAPI>()
+    if (mappings == MinecraftMappings.NO_INTERMEDIATE) {
+        loom.useIntermediateMappings.set(false)
+    }
+
+    dependencies {
+        add("minecraft", "com.mojang:minecraft:$minecraftVersion")
+        when (mappings) {
+            is MinecraftMappings.Yarn -> add("mappings", "net.fabricmc:yarn:${mappings.version}:v2")
+            MinecraftMappings.Official -> add("mappings", loom.officialMojangMappings())
+            MinecraftMappings.NO_INTERMEDIATE -> add("mappings", files(rootProject.file("gradle/mappings/minecraft-26.1-empty-named.jar")))
+        }
+        add("modImplementation", "net.fabricmc:fabric-loader:$loaderVersion")
+        add("modImplementation", "net.fabricmc.fabric-api:fabric-api:$fabricVersion")
+        add("compileOnly", "org.jetbrains:annotations:$jetbrainsAnnotationsVersion")
+        add("implementation", project(":common"))
+        add("include", project(":common"))
+
+        // NeoLinkAPI is the canonical tunnel implementation. Keep it as Maven
+        // coordinates so a fresh GitHub clone can build without local paths.
+        add("implementation", "top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion")
+        add("include", "top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion")
+        add("include", "top.ceroxe.api:neolinkapi-shared:$neoLinkApiVersion")
+        add("include", "top.ceroxe.api:ceroxe-core:2.0.0")
+        add("include", "top.ceroxe.api:ceroxe-detector:2.0.0")
+    }
+
+    val resourceProperties = mapOf(
+        "version" to version.toString(),
+        "minecraft_version" to minecraftVersion,
+        "loader_version" to loaderVersion,
+        "fabric_version" to fabricVersion
+    )
+
+    tasks.named<ProcessResources>("processResources") {
+        inputs.properties(resourceProperties)
+        filesMatching("fabric.mod.json") {
+            expand(resourceProperties)
+        }
+    }
+
+    tasks.named<Jar>("jar") {
+        from(rootProject.file("LICENSE")) {
+            rename { "${it}_$archivesBaseName" }
+        }
+    }
+
+    extensions.configure<PublishingExtension>("publishing") {
+        publications {
+            create<MavenPublication>("mavenJava") {
+                artifactId = "$archivesBaseName-fabric-$minecraftVersion"
+                from(components["java"])
+            }
+        }
+    }
+}
+
+sealed interface MinecraftMappings {
+    data class Yarn(val version: String) : MinecraftMappings
+    data object Official : MinecraftMappings
+    data object NO_INTERMEDIATE : MinecraftMappings
+}
+
+project(":fabric:v1_21_8") {
+    if (shouldConfigureFabricModule(path)) {
+        configureFabricModule(
+            minecraftVersion = "1.21.8",
+            loaderVersion = "0.16.14",
+            fabricVersion = "0.134.0+1.21.8",
+            javaVersion = 21,
+            versionSuffix = "fabric.1.21-1.21.8",
+            mappings = MinecraftMappings.Official
         )
     }
 }
 
-tasks.withType<Jar> {
-    from("LICENSE") {
-        rename { "${it}_${archives_base_name}" }
-    }
-}
-
-// 配置 Maven 发布
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            artifactId = archives_base_name
-            from(components["java"])
-        }
-    }
-
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/NeoProxy/NeoLinkMC")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
-            }
-        }
+project(":fabric:v26_1") {
+    if (shouldConfigureFabricModule(path)) {
+        configureFabricModule(
+            minecraftVersion = "26.1",
+            loaderVersion = "0.18.5",
+            fabricVersion = "0.144.0+26.1",
+            javaVersion = 25,
+            versionSuffix = "fabric.26.1",
+            mappings = MinecraftMappings.NO_INTERMEDIATE
+        )
     }
 }
