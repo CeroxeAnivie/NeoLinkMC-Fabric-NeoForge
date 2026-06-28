@@ -3,18 +3,14 @@ package neoproxy.neolinkmc.gui;
 import neoproxy.neolinkmc.NeoLinkMC;
 import neoproxy.neolinkmc.config.ConnectionConfig;
 import neoproxy.neolinkmc.config.NeoLinkConfig;
+import neoproxy.neolinkmc.gui.LanScreenLayout.Positions;
 import neoproxy.neolinkmc.service.ConnectionService;
 import neoproxy.neolinkmc.service.MinecraftMessageHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.StringWidget;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.layouts.GridLayout;
-import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
-import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
@@ -22,6 +18,7 @@ import net.minecraft.world.level.GameType;
 
 import java.awt.Desktop;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -39,17 +36,12 @@ public class NeoLinkConfigScreen extends Screen {
     private static final Component TITLE = Component.translatable("neolink.gui.title");
     private static final Component ADVANCED_SETTINGS = Component.translatable("neolink.gui.advanced_settings");
     private static final Component OPEN_CONFIG_FOLDER = Component.translatable("neolink.gui.open_config_folder");
+    private static final Component TUNNEL_SETTINGS = Component.translatable("neolink.gui.tunnel_settings");
+    private static final Component PLAYER_SETTINGS = Component.translatable("neolink.gui.player_settings");
     private static final Component START_TUNNEL = Component.translatable("neolink.gui.start_tunnel");
     private static final Component CANCEL = Component.translatable("neolink.gui.cancel");
     private static final Component PORT_LABEL = Component.translatable("neolink.gui.port");
     private static final Component MAX_PLAYERS_LABEL = Component.translatable("neolink.gui.max_players");
-
-    // ==================== 布局常量 ====================
-
-    private static final int BUTTON_WIDTH = 150;
-    private static final int BUTTON_HEIGHT = 20;
-    private static final int INPUT_WIDTH = 150;
-    private static final int PADDING = 10;
 
     // ==================== 配置状态 ====================
 
@@ -58,7 +50,10 @@ public class NeoLinkConfigScreen extends Screen {
 
     // ==================== GUI 组件 ====================
 
-    public final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
+    private Button gameModeButton;
+    private Button allowCheatsButton;
+    private Button onlineModeButton;
+    private Button allowPvpButton;
     private EditBox portEditBox;
     private EditBox maxPlayersEditBox;
 
@@ -76,70 +71,32 @@ public class NeoLinkConfigScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        Positions layout = LanScreenLayout.calculate(this.width, this.height);
 
-        // 添加标题到头部
-        this.layout.addToHeader(new StringWidget(this.title, this.font));
+        addCenteredStringWidget(TUNNEL_SETTINGS, layout.centerX(), layout.titleY());
+        addCenteredStringWidget(PLAYER_SETTINGS, layout.centerX(), layout.playerSettingsY());
+        addStringWidget(PORT_LABEL, layout.leftColumnX(), layout.inputLabelY());
+        addStringWidget(MAX_PLAYERS_LABEL, layout.rightColumnX(), layout.inputLabelY());
 
-        // 创建内容区域 - 使用网格布局
-        GridLayout gridLayout = new GridLayout();
-        gridLayout.columnSpacing(8).rowSpacing(4);
-        GridLayout.RowHelper rowHelper = gridLayout.createRowHelper(2);
+        addRenderableWidget(createButton(layout.leftColumnX(), layout.topRowY(), ADVANCED_SETTINGS, this::onAdvancedSettingsClick));
+        addRenderableWidget(createButton(layout.rightColumnX(), layout.topRowY(), OPEN_CONFIG_FOLDER, this::onOpenConfigFolderClick));
 
-        // 游戏模式选择
-        rowHelper.addChild(CycleButton.builder(GameType::getShortDisplayName, this.config.gameType)
-                .withValues(GameType.values())
-                .create(Component.translatable("selectWorld.gameMode"), (cycleButton, gameType) -> {
-                    this.config.gameType = gameType;
-                }));
+        this.gameModeButton = addRenderableWidget(createButton(
+                layout.leftColumnX(), layout.firstOptionRowY(), getGameModeDisplayText(), this::onGameModeClick));
+        this.onlineModeButton = addRenderableWidget(createButton(
+                layout.rightColumnX(), layout.firstOptionRowY(), getOnlineModeDisplayText(), this::onOnlineModeClick));
+        this.allowCheatsButton = addRenderableWidget(createButton(
+                layout.leftColumnX(), layout.secondOptionRowY(), getAllowCheatsDisplayText(), this::onAllowCheatsClick));
+        this.allowPvpButton = addRenderableWidget(createButton(
+                layout.rightColumnX(), layout.secondOptionRowY(), getAllowPvpDisplayText(), this::onAllowPvpClick));
 
-        // 在线模式选择
-        rowHelper.addChild(CycleButton.builder(OnlineMode::getDisplayName, this.config.onlineMode)
-                .withValues(OnlineMode.values())
-                .withTooltip((mode) -> Tooltip.create(mode.gettoolTip()))
-                .create(Component.translatable("neolink.gui.online_mode"), (cycleButton, onlineMode) -> {
-                    this.config.onlineMode = onlineMode;
-                }));
+        this.portEditBox = addRenderableWidget(createFilteredEditBox(layout.leftColumnX(), layout.inputRowY(),
+                String.valueOf(this.config.localPort), this::isValidPortInput, 5));
+        this.maxPlayersEditBox = addRenderableWidget(createFilteredEditBox(layout.rightColumnX(), layout.inputRowY(),
+                String.valueOf(this.config.maxPlayers), this::isValidMaxPlayersInput, 3));
 
-        // 允许作弊
-        rowHelper.addChild(CycleButton.onOffBuilder(this.config.allowCheats)
-                .create(Component.translatable("selectWorld.allowCommands"), (cycleButton, allowCheats) -> {
-                    this.config.allowCheats = allowCheats;
-                }));
-
-        // 允许 PvP
-        rowHelper.addChild(CycleButton.onOffBuilder(this.config.pvpAllowed)
-                .create(Component.translatable("neolink.gui.pvp"), (cycleButton, pvp) -> {
-                    this.config.pvpAllowed = pvp;
-                }));
-
-        // 端口输入
-        rowHelper.addChild(new StringWidget(PORT_LABEL, this.font));
-        this.portEditBox = createFilteredEditBox(INPUT_WIDTH, BUTTON_HEIGHT,
-                String.valueOf(this.config.localPort), this::isValidPortInput, 5);
-        rowHelper.addChild(this.portEditBox);
-
-        // 最大玩家数输入
-        rowHelper.addChild(new StringWidget(MAX_PLAYERS_LABEL, this.font));
-        this.maxPlayersEditBox = createFilteredEditBox(INPUT_WIDTH, BUTTON_HEIGHT,
-                String.valueOf(this.config.maxPlayers), this::isValidMaxPlayersInput, 3);
-        rowHelper.addChild(this.maxPlayersEditBox);
-
-        this.layout.addToContents(gridLayout);
-
-        // 底部按钮
-        LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));
-        footer.addChild(Button.builder(ADVANCED_SETTINGS, this::onAdvancedSettingsClick).width(BUTTON_WIDTH).build());
-        footer.addChild(Button.builder(OPEN_CONFIG_FOLDER, this::onOpenConfigFolderClick).width(BUTTON_WIDTH).build());
-        footer.addChild(Button.builder(START_TUNNEL, this::onStartTunnelClick).width(BUTTON_WIDTH).build());
-        footer.addChild(Button.builder(CANCEL, this::onCancelClick).width(BUTTON_WIDTH).build());
-
-        this.layout.visitWidgets(this::addRenderableWidget);
-        this.repositionElements();
-    }
-
-    @Override
-    protected void repositionElements() {
-        this.layout.arrangeElements();
+        addRenderableWidget(createButton(layout.leftColumnX(), layout.bottomRowY(), START_TUNNEL, this::onStartTunnelClick));
+        addRenderableWidget(createButton(layout.rightColumnX(), layout.bottomRowY(), CANCEL, this::onCancelClick));
     }
 
     @Override
@@ -149,20 +106,39 @@ public class NeoLinkConfigScreen extends Screen {
 
     // ==================== 组件创建辅助方法 ====================
 
-    private EditBox createEditBox(int width, int height, String initial) {
+    private Button createButton(int x, int y, Component message, Consumer<Button> onPress) {
+        return Button.builder(message, onPress::accept)
+                .pos(x, y)
+                .size(LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT)
+                .build();
+    }
+
+    private void addCenteredStringWidget(Component message, int centerX, int y) {
+        StringWidget widget = new StringWidget(message, this.font);
+        widget.setPosition(centerX - this.font.width(message) / 2, y);
+        addRenderableWidget(widget);
+    }
+
+    private void addStringWidget(Component message, int x, int y) {
+        StringWidget widget = new StringWidget(message, this.font);
+        widget.setPosition(x, y);
+        addRenderableWidget(widget);
+    }
+
+    private EditBox createEditBox(int x, int y, String initial) {
         EditBox editBox = new EditBox(
                 this.font,
-                0, 0,
-                width, height,
+                x, y,
+                LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                 Component.literal("")
         );
         editBox.setValue(initial);
         return editBox;
     }
 
-    private EditBox createFilteredEditBox(int width, int height, String initial,
+    private EditBox createFilteredEditBox(int x, int y, String initial,
                                           Predicate<String> filter, int maxLength) {
-        EditBox editBox = createEditBox(width, height, initial);
+        EditBox editBox = createEditBox(x, y, initial);
         editBox.setResponder((value) -> {
             if (!filter.test(value)) {
                 String validValue = value.isEmpty() ? "" : value.replaceAll("[^0-9]", "");
@@ -173,6 +149,41 @@ public class NeoLinkConfigScreen extends Screen {
         });
         editBox.setMaxLength(maxLength);
         return editBox;
+    }
+
+    // ==================== 按钮文本生成 ====================
+
+    private Component getGameModeDisplayText() {
+        String modeName = switch (this.config.gameType) {
+            case SURVIVAL -> Component.translatable("neolink.gui.gamemode.survival").getString();
+            case CREATIVE -> Component.translatable("neolink.gui.gamemode.creative").getString();
+            case ADVENTURE -> Component.translatable("neolink.gui.gamemode.adventure").getString();
+            case SPECTATOR -> Component.translatable("neolink.gui.gamemode.spectator").getString();
+        };
+        return Component.literal("游戏模式：" + modeName);
+    }
+
+    private Component getAllowCheatsDisplayText() {
+        String status = this.config.allowCheats
+                ? Component.translatable("neolink.gui.status.on").getString()
+                : Component.translatable("neolink.gui.status.off").getString();
+        return Component.literal("允许作弊：" + status);
+    }
+
+    private Component getOnlineModeDisplayText() {
+        String modeName = switch (this.config.onlineMode) {
+            case ONLINE_ONLINE_UUID_ONLY -> Component.translatable("neolink.gui.online_mode.online").getString();
+            case OFFLINE_TRY_ONLINE_UUID_FIRST -> Component.translatable("neolink.gui.online_mode.offline_fixed").getString();
+            case OFFLINE_OFFLINE_UUID_ONLY -> Component.translatable("neolink.gui.online_mode.offline_vanilla").getString();
+        };
+        return Component.literal(modeName);
+    }
+
+    private Component getAllowPvpDisplayText() {
+        String status = this.config.pvpAllowed
+                ? Component.translatable("neolink.gui.status.on").getString()
+                : Component.translatable("neolink.gui.status.off").getString();
+        return Component.literal("允许 PVP：" + status);
     }
 
     // ==================== 输入验证 ====================
@@ -216,6 +227,35 @@ public class NeoLinkConfigScreen extends Screen {
         if (!success) {
             NeoLinkMC.LOGGER.error("打开配置文件夹失败");
         }
+    }
+
+    private void onGameModeClick(Button button) {
+        this.config.gameType = switch (this.config.gameType) {
+            case SURVIVAL -> GameType.CREATIVE;
+            case CREATIVE -> GameType.ADVENTURE;
+            case ADVENTURE -> GameType.SPECTATOR;
+            case SPECTATOR -> GameType.SURVIVAL;
+        };
+        this.gameModeButton.setMessage(getGameModeDisplayText());
+    }
+
+    private void onAllowCheatsClick(Button button) {
+        this.config.allowCheats = !this.config.allowCheats;
+        this.allowCheatsButton.setMessage(getAllowCheatsDisplayText());
+    }
+
+    private void onOnlineModeClick(Button button) {
+        this.config.onlineMode = switch (this.config.onlineMode) {
+            case ONLINE_ONLINE_UUID_ONLY -> OnlineMode.OFFLINE_TRY_ONLINE_UUID_FIRST;
+            case OFFLINE_TRY_ONLINE_UUID_FIRST -> OnlineMode.OFFLINE_OFFLINE_UUID_ONLY;
+            case OFFLINE_OFFLINE_UUID_ONLY -> OnlineMode.ONLINE_ONLINE_UUID_ONLY;
+        };
+        this.onlineModeButton.setMessage(getOnlineModeDisplayText());
+    }
+
+    private void onAllowPvpClick(Button button) {
+        this.config.pvpAllowed = !this.config.pvpAllowed;
+        this.allowPvpButton.setMessage(getAllowPvpDisplayText());
     }
 
     private void onStartTunnelClick(Button button) {

@@ -3,6 +3,7 @@ package neoproxy.neolinkmc.gui;
 import neoproxy.neolinkmc.NeoLinkMC;
 import neoproxy.neolinkmc.config.ConnectionConfig;
 import neoproxy.neolinkmc.config.NeoLinkConfig;
+import neoproxy.neolinkmc.gui.LanScreenLayout.Positions;
 import neoproxy.neolinkmc.service.ConnectionService;
 import neoproxy.neolinkmc.service.MinecraftMessageHandler;
 import net.minecraft.client.Minecraft;
@@ -46,23 +47,6 @@ public class NeoLinkConfigScreen extends Screen {
 
     // ==================== 布局常量 ====================
 
-    private static final int BUTTON_WIDTH = 150;
-    private static final int BUTTON_HEIGHT = 20;
-    private static final int INPUT_WIDTH = 150;
-    private static final int LEFT_COLUMN_OFFSET = -155;
-    private static final int RIGHT_COLUMN_OFFSET = 5;
-    private static final int TOP_TITLE_Y = 50;
-    private static final int TOP_ROW_Y = 74;
-    private static final int PLAYER_SETTINGS_Y = 132;
-    private static final int FIRST_OPTION_ROW_Y = 164;
-    private static final int SECOND_OPTION_ROW_Y = 188;
-    private static final int BOTTOM_LABEL_OFFSET = 66;
-    private static final int BOTTOM_INPUT_OFFSET = 54;
-    private static final int BOTTOM_BUTTON_OFFSET = 28;
-    private static final int COMPACT_INPUT_LABEL_GAP = 16;
-    private static final int COMPACT_INPUT_ROW_GAP = 12;
-    private static final int COMPACT_BOTTOM_ROW_GAP = 12;
-
     // ==================== 配置状态 ====================
 
     private final Screen parentScreen;
@@ -105,35 +89,20 @@ public class NeoLinkConfigScreen extends Screen {
     protected void init() {
         super.init();
 
-        int centerX = this.width / 2;
-        int leftButtonX = centerX + LEFT_COLUMN_OFFSET;
-        int rightButtonX = centerX + RIGHT_COLUMN_OFFSET;
-        int topRowY = TOP_ROW_Y;
-        int firstRowY = FIRST_OPTION_ROW_Y;
-        int secondRowY = SECOND_OPTION_ROW_Y;
-        int inputLabelY = this.height - BOTTOM_LABEL_OFFSET;
-        int inputRowY = this.height - BOTTOM_INPUT_OFFSET;
-        int bottomRowY = this.height - BOTTOM_BUTTON_OFFSET;
-
-        int minimumInputLabelY = secondRowY + BUTTON_HEIGHT + COMPACT_INPUT_LABEL_GAP;
-        if (inputLabelY < minimumInputLabelY) {
-            inputLabelY = minimumInputLabelY;
-            inputRowY = inputLabelY + COMPACT_INPUT_ROW_GAP;
-            bottomRowY = inputRowY + BUTTON_HEIGHT + COMPACT_BOTTOM_ROW_GAP;
-        }
+        Positions layout = LanScreenLayout.calculate(this.width, this.height);
 
         // 保存Y坐标供render使用
-        this.titleY = TOP_TITLE_Y;
-        this.subtitleY = PLAYER_SETTINGS_Y;
-        this.inputLabelY = inputLabelY;
+        this.titleY = layout.titleY();
+        this.subtitleY = layout.playerSettingsY();
+        this.inputLabelY = layout.inputLabelY();
 
         // ==================== 第一行：顶部按钮 ====================
         this.advancedSettingsButton = addRenderableWidget(
-                createButton(leftButtonX, topRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.topRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         ADVANCED_SETTINGS, this::onAdvancedSettingsClick)
         );
         this.openConfigFolderButton = addRenderableWidget(
-                createButton(rightButtonX, topRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.topRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         OPEN_CONFIG_FOLDER, this::onOpenConfigFolderClick)
         );
 
@@ -141,43 +110,43 @@ public class NeoLinkConfigScreen extends Screen {
 
         // ==================== 第四行：游戏设置按钮网格 ====================
         this.gameModeButton = addRenderableWidget(
-                createButton(leftButtonX, firstRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.firstOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         getGameModeDisplayText(), this::onGameModeClick)
         );
         this.onlineModeButton = addRenderableWidget(
-                createButton(rightButtonX, firstRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.firstOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         getOnlineModeDisplayText(), this::onOnlineModeClick)
         );
 
         this.allowCheatsButton = addRenderableWidget(
-                createButton(leftButtonX, secondRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.secondOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         getAllowCheatsDisplayText(), this::onAllowCheatsClick)
         );
         this.allowPvpButton = addRenderableWidget(
-                createButton(rightButtonX, secondRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.secondOptionRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         getAllowPvpDisplayText(), this::onAllowPvpClick)
         );
 
         // ==================== 第五/六行：输入框标签和输入框 ====================
 
         this.portEditBox = addRenderableWidget(
-                createFilteredEditBox(leftButtonX, inputRowY, 147, BUTTON_HEIGHT,
+                createFilteredEditBox(layout.leftColumnX(), layout.inputRowY(), LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         String.valueOf(this.config.localPort),
                         this::isValidPortInput, 5)
         );
         this.maxPlayersEditBox = addRenderableWidget(
-                createFilteredEditBox(rightButtonX, inputRowY, 147, BUTTON_HEIGHT,
+                createFilteredEditBox(layout.rightColumnX(), layout.inputRowY(), LanScreenLayout.INPUT_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         String.valueOf(this.config.maxPlayers),
                         this::isValidMaxPlayersInput, 3)
         );
 
         // ==================== 第七行：底部按钮 ====================
         this.startTunnelButton = addRenderableWidget(
-                createButton(leftButtonX, bottomRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.leftColumnX(), layout.bottomRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         START_TUNNEL, this::onStartTunnelClick)
         );
         this.cancelButton = addRenderableWidget(
-                createButton(rightButtonX, bottomRowY, BUTTON_WIDTH, BUTTON_HEIGHT,
+                createButton(layout.rightColumnX(), layout.bottomRowY(), LanScreenLayout.BUTTON_WIDTH, LanScreenLayout.BUTTON_HEIGHT,
                         CANCEL, this::onCancelClick)
         );
     }
@@ -188,19 +157,17 @@ public class NeoLinkConfigScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         // 然后在背景之上绘制自定义文本
-        int centerX = this.width / 2;
+        Positions layout = LanScreenLayout.calculate(this.width, this.height);
 
         // 渲染标题 - 使用init中动态计算的Y坐标
-        drawCenteredString(guiGraphics, TUNNEL_SETTINGS, centerX, this.titleY, 0xFFFFFFFF);
+        drawCenteredString(guiGraphics, TUNNEL_SETTINGS, layout.centerX(), this.titleY, 0xFFFFFFFF);
 
         // 渲染副标题 - 使用init中动态计算的Y坐标，颜色使用白色更明显
-        drawCenteredString(guiGraphics, PLAYER_SETTINGS, centerX, this.subtitleY, 0xFFFFFFFF);
+        drawCenteredString(guiGraphics, PLAYER_SETTINGS, layout.centerX(), this.subtitleY, 0xFFFFFFFF);
 
         // 渲染输入框标签 - 使用init中动态计算的Y坐标
-        int leftLabelX = centerX + LEFT_COLUMN_OFFSET;
-        int rightLabelX = centerX + RIGHT_COLUMN_OFFSET;
-        drawString(guiGraphics, PORT_LABEL, leftLabelX, this.inputLabelY, 0xFFAAAAAA);
-        drawString(guiGraphics, MAX_PLAYERS_LABEL, rightLabelX, this.inputLabelY, 0xFFAAAAAA);
+        drawString(guiGraphics, PORT_LABEL, layout.leftColumnX(), this.inputLabelY, 0xFFAAAAAA);
+        drawString(guiGraphics, MAX_PLAYERS_LABEL, layout.rightColumnX(), this.inputLabelY, 0xFFAAAAAA);
     }
 
     // ==================== 组件创建辅助方法 ====================
