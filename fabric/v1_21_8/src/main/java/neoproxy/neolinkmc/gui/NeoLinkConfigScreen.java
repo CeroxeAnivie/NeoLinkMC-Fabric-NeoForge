@@ -7,7 +7,6 @@ import neoproxy.neolinkmc.service.ConnectionService;
 import neoproxy.neolinkmc.service.MinecraftMessageHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -50,7 +49,6 @@ public class NeoLinkConfigScreen extends Screen {
     private static final int BUTTON_WIDTH = 150;
     private static final int BUTTON_HEIGHT = 20;
     private static final int INPUT_WIDTH = 150;
-    private static final int COLUMN_GAP = 10;
     private static final int LEFT_COLUMN_OFFSET = -155;
     private static final int RIGHT_COLUMN_OFFSET = 5;
     private static final int TOP_TITLE_Y = 50;
@@ -61,6 +59,9 @@ public class NeoLinkConfigScreen extends Screen {
     private static final int BOTTOM_LABEL_OFFSET = 66;
     private static final int BOTTOM_INPUT_OFFSET = 54;
     private static final int BOTTOM_BUTTON_OFFSET = 28;
+    private static final int COMPACT_INPUT_LABEL_GAP = 16;
+    private static final int COMPACT_INPUT_ROW_GAP = 12;
+    private static final int COMPACT_BOTTOM_ROW_GAP = 12;
 
     // ==================== 配置状态 ====================
 
@@ -107,16 +108,23 @@ public class NeoLinkConfigScreen extends Screen {
         int centerX = this.width / 2;
         int leftButtonX = centerX + LEFT_COLUMN_OFFSET;
         int rightButtonX = centerX + RIGHT_COLUMN_OFFSET;
-        int topRowY = clampTopY(TOP_ROW_Y);
-        int firstRowY = clampTopY(FIRST_OPTION_ROW_Y);
-        int secondRowY = clampTopY(SECOND_OPTION_ROW_Y);
-        int inputLabelY = Math.max(secondRowY + BUTTON_HEIGHT + 16, this.height - BOTTOM_LABEL_OFFSET);
-        int inputRowY = Math.max(inputLabelY + 12, this.height - BOTTOM_INPUT_OFFSET);
-        int bottomRowY = Math.max(inputRowY + BUTTON_HEIGHT + 12, this.height - BOTTOM_BUTTON_OFFSET);
+        int topRowY = TOP_ROW_Y;
+        int firstRowY = FIRST_OPTION_ROW_Y;
+        int secondRowY = SECOND_OPTION_ROW_Y;
+        int inputLabelY = this.height - BOTTOM_LABEL_OFFSET;
+        int inputRowY = this.height - BOTTOM_INPUT_OFFSET;
+        int bottomRowY = this.height - BOTTOM_BUTTON_OFFSET;
+
+        int minimumInputLabelY = secondRowY + BUTTON_HEIGHT + COMPACT_INPUT_LABEL_GAP;
+        if (inputLabelY < minimumInputLabelY) {
+            inputLabelY = minimumInputLabelY;
+            inputRowY = inputLabelY + COMPACT_INPUT_ROW_GAP;
+            bottomRowY = inputRowY + BUTTON_HEIGHT + COMPACT_BOTTOM_ROW_GAP;
+        }
 
         // 保存Y坐标供render使用
-        this.titleY = clampTopY(TOP_TITLE_Y);
-        this.subtitleY = clampTopY(PLAYER_SETTINGS_Y);
+        this.titleY = TOP_TITLE_Y;
+        this.subtitleY = PLAYER_SETTINGS_Y;
         this.inputLabelY = inputLabelY;
 
         // ==================== 第一行：顶部按钮 ====================
@@ -193,10 +201,6 @@ public class NeoLinkConfigScreen extends Screen {
         int rightLabelX = centerX + RIGHT_COLUMN_OFFSET;
         drawString(guiGraphics, PORT_LABEL, leftLabelX, this.inputLabelY, 0xFFAAAAAA);
         drawString(guiGraphics, MAX_PLAYERS_LABEL, rightLabelX, this.inputLabelY, 0xFFAAAAAA);
-    }
-
-    private int clampTopY(int preferredY) {
-        return Math.max(16, Math.min(preferredY, this.height - 120));
     }
 
     // ==================== 组件创建辅助方法 ====================
