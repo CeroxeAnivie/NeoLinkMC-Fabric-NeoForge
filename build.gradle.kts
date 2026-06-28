@@ -82,13 +82,12 @@ fun Project.configureFabricModule(
     loaderVersion: String,
     fabricVersion: String,
     javaVersion: Int,
-    versionSuffix: String,
     mappings: MinecraftMappings
 ) {
     apply(plugin = "fabric-loom")
     apply(plugin = "maven-publish")
 
-    version = "${rootProject.version}+$versionSuffix"
+    version = rootProject.version
 
     extensions.configure<JavaPluginExtension> {
         toolchain {
@@ -176,7 +175,6 @@ project(":fabric:v1_21_8") {
             loaderVersion = "0.16.14",
             fabricVersion = "0.134.0+1.21.8",
             javaVersion = 21,
-            versionSuffix = "fabric.1.21-1.21.8",
             mappings = MinecraftMappings.Official
         )
     }
@@ -189,7 +187,6 @@ project(":fabric:v26_1") {
             loaderVersion = "0.18.5",
             fabricVersion = "0.144.0+26.1",
             javaVersion = 25,
-            versionSuffix = "fabric.26.1",
             mappings = MinecraftMappings.NO_INTERMEDIATE
         )
     }
