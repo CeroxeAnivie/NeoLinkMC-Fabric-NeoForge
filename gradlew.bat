@@ -2,7 +2,7 @@
 @echo off
 setlocal
 
-set "JAVA_HOME=C:\Program Files\Java\zulu21.44.17-ca-fx-jdk21.0.8-win_x64"
+set "JAVA_HOME=C:\Program Files\Java\graalvm-jdk-25.0.3+9.1"
 set "APP_HOME=%~dp0"
 if "%APP_HOME%"=="" set "APP_HOME=."
 for %%i in ("%APP_HOME%") do set "APP_HOME=%%~fi"
