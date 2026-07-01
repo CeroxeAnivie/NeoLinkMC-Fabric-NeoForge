@@ -14,10 +14,10 @@ import org.slf4j.Logger;
 import java.nio.file.Path;
 
 /**
- * Fabric entrypoint kept intentionally thin.
+ * Fabric entrypoint 刻意保持轻量。
  *
- * <p>All loader-neutral behavior lives in {@link NeoLinkCore}; this class only
- * adapts Fabric metadata, config paths, and lifecycle events.</p>
+ * <p>所有 loader-neutral 行为都位于 {@link NeoLinkCore}；本类只适配 Fabric metadata、
+ * 配置路径和生命周期事件。</p>
  */
 public final class NeoLinkMC implements ModInitializer, ClientModInitializer {
     public static final String MOD_ID = NeoLinkCore.MOD_ID;

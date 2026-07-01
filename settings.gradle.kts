@@ -17,6 +17,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
+        if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
+            mavenLocal {
+                content {
+                    includeGroup("top.ceroxe.api")
+                }
+            }
+        }
         mavenCentral()
         maven("https://maven.minecraftforge.net/") {
             name = "Forge"
@@ -35,12 +42,64 @@ dependencyResolutionManagement {
 
 rootProject.name = "NeoLinkMC"
 
-include("common")
-include("fabric")
-include("forge")
-include("neoforge")
+val requestedTasks = gradle.startParameter.taskNames
+val defaultSyncModules = mapOf(
+    "fabric" to listOf("v1_21_8"),
+    "forge" to emptyList<String>(),
+    "neoforge" to emptyList()
+)
+val diagnosticRootTasks = setOf(
+    "help",
+    "tasks",
+    "projects",
+    "properties",
+    "dependencies",
+    "dependencyInsight",
+    "components",
+    "model",
+    "wrapper"
+)
+val isDefaultSyncRequest = requestedTasks.isEmpty() ||
+    requestedTasks.all { taskName -> ":" !in taskName && taskName in diagnosticRootTasks }
+val shouldIncludeAllModules = providers.gradleProperty("neolinkmc.fullMatrix").orNull == "true" ||
+    requestedTasks.any { taskName -> ":" !in taskName && taskName !in diagnosticRootTasks }
 
-val minecraftModules = listOf(
+fun requestedModuleNames(loader: String, allModules: List<String>, defaultModules: List<String>): List<String> {
+    if (shouldIncludeAllModules) {
+        return allModules
+    }
+
+    if (isDefaultSyncRequest) {
+        return allModules.filter { it in defaultModules }
+    }
+
+    val normalizedLoader = ":$loader"
+    val requestedForLoader = requestedTasks.filter { taskName ->
+        taskName == loader ||
+            taskName == normalizedLoader ||
+            taskName.startsWith("$loader:") ||
+            taskName.startsWith("$normalizedLoader:")
+    }
+
+    if (requestedForLoader.isEmpty()) {
+        return emptyList()
+    }
+
+    val requestedModules = requestedForLoader.mapNotNull { taskName ->
+        val segments = taskName.trimStart(':').split(':')
+        segments.getOrNull(1)?.takeIf { it.isNotBlank() }
+    }.toSet()
+
+    return if (requestedModules.isEmpty()) {
+        allModules
+    } else {
+        allModules.filter { it in requestedModules }
+    }
+}
+
+include("common")
+
+val fabricModules = listOf(
     "v1_20",
     "v1_20_1",
     "v1_20_2",
@@ -60,14 +119,13 @@ val minecraftModules = listOf(
     "v1_21_9",
     "v1_21_10",
     "v1_21_11",
-    "v26_1"
+    "v26_1",
+    "v26_1_1",
+    "v26_1_2",
+    "v26_2"
 )
 
-minecraftModules.forEach { module ->
-    include("fabric:$module")
-}
-
-listOf(
+val forgeModules = listOf(
     "v1_20",
     "v1_20_1",
     "v1_20_2",
@@ -83,12 +141,14 @@ listOf(
     "v1_21_7",
     "v1_21_8",
     "v1_21_9",
-    "v1_21_10"
-).forEach { module ->
-    include("forge:$module")
-}
+    "v1_21_10",
+    "v26_1",
+    "v26_1_1",
+    "v26_1_2",
+    "v26_2"
+)
 
-listOf(
+val neoForgeModules = listOf(
     "v1_20_4",
     "v1_20_6",
     "v1_21",
@@ -102,7 +162,29 @@ listOf(
     "v1_21_9",
     "v1_21_10",
     "v1_21_11",
-    "v26_1"
-).forEach { module ->
-    include("neoforge:$module")
+    "v26_1",
+    "v26_1_1",
+    "v26_1_2",
+    "v26_2"
+)
+
+requestedModuleNames("fabric", fabricModules, defaultSyncModules.getValue("fabric")).takeIf { it.isNotEmpty() }?.let { modules ->
+    include("fabric")
+    modules.forEach { module ->
+        include("fabric:$module")
+    }
+}
+
+requestedModuleNames("forge", forgeModules, defaultSyncModules.getValue("forge")).takeIf { it.isNotEmpty() }?.let { modules ->
+    include("forge")
+    modules.forEach { module ->
+        include("forge:$module")
+    }
+}
+
+requestedModuleNames("neoforge", neoForgeModules, defaultSyncModules.getValue("neoforge")).takeIf { it.isNotEmpty() }?.let { modules ->
+    include("neoforge")
+    modules.forEach { module ->
+        include("neoforge:$module")
+    }
 }

@@ -1,13 +1,11 @@
 package neoproxy.neolinkmc.gui;
 
 /**
- * Shared proportional geometry for NeoLinkMC's LAN configuration screen.
+ * NeoLinkMC LAN 配置界面共用的比例布局几何。
  *
- * <p>The layout is derived from the same two-column visual language as the
- * vanilla/LSP LAN screen, but every row belongs to one content block. The block
- * is centered when there is enough room and its gaps compress together when the
- * logical GUI height is small, so resize and GUI scale changes cannot make the
- * bottom controls collide with the middle rows.</p>
+ * <p>该布局沿用 vanilla/LSP LAN 界面的双列视觉语言，但每一行都归属于同一个内容块。
+ * 空间足够时内容块居中；logical GUI 高度较小时，间距会整体压缩，因此窗口尺寸变化和
+ * GUI scale 变化不会让底部控件与中部行发生碰撞。</p>
  */
 public final class LanScreenLayout {
     public static final int MIN_BUTTON_WIDTH = 150;

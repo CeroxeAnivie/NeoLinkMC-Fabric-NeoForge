@@ -3,13 +3,11 @@ package neoproxy.neolinkmc.config;
 import java.util.Objects;
 
 /**
- * Platform-neutral tunnel configuration passed from a Minecraft loader module
- * into the shared NeoLinkAPI adapter.
+ * 从 Minecraft loader 模块传入共享 NeoLinkAPI adapter 的 platform-neutral tunnel 配置。
  *
- * <p>The common module deliberately owns only primitive tunnel fields. Fabric,
- * Forge, NeoForge, and future version-specific modules can each decide how to
- * load UI/config files without leaking loader APIs into the reusable tunnel
- * lifecycle.</p>
+ * <p>common 模块有意只持有 primitive tunnel 字段。Fabric、Forge、NeoForge 以及
+ * 未来的特定版本模块，可以分别决定如何加载 UI/config 文件，而不会把 loader API
+ * 泄漏进可复用的 tunnel 生命周期。</p>
  */
 public record ConnectionConfig(
         String remoteDomain,

@@ -4,18 +4,17 @@ import neoproxy.neolinkmc.service.ConnectionService;
 import neoproxy.neolinkmc.service.MinecraftMessageHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.server.IntegratedServer;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
 
 /**
- * Fabric entrypoint for 26.1; loader-specific code is intentionally limited to
- * metadata, config path, and lifecycle event bridging.
+ * Fabric 26.x entrypoint.
+ *
+ * <p>26.x currently has no usable intermediary mapping set for this build, so this entrypoint
+ * intentionally depends only on Fabric Loader. Keeping Fabric API lifecycle hooks out of this
+ * template prevents 26.x's no-intermediate mapping mode from remapping unrelated Fabric API mods.</p>
  */
 public final class NeoLinkMC implements ModInitializer, ClientModInitializer {
     public static final String MOD_ID = NeoLinkCore.MOD_ID;
@@ -66,23 +65,12 @@ public final class NeoLinkMC implements ModInitializer, ClientModInitializer {
     @Override
     public void onInitialize() {
         NeoLinkCore.initialize(FabricLoader.getInstance().getConfigDir(), VERSION, new MinecraftMessageHandler());
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> NeoLinkCore.onServerStarted(server.getPort()));
-        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
-                NeoLinkCore.onServerStopping(server instanceof IntegratedServer));
+        LOGGER.info("NeoLinkMC Fabric 26.x 初始化完成");
+        LOGGER.debug("配置目录路径: {}", CONFIG_DIR);
     }
 
     @Override
     public void onInitializeClient() {
-        ClientLifecycleEvents.CLIENT_STARTED.register(client -> NeoLinkCore.onClientStarted());
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> NeoLinkCore.onClientStopping());
-
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            if (client.hasSingleplayerServer() || (client.getCurrentServer() != null && client.isLocalServer())) {
-                NeoLinkCore.onLocalPlayDisconnect();
-            }
-        });
-
-        LOGGER.info("NeoLinkMC Fabric 26.1 客户端初始化完成");
-        LOGGER.debug("配置目录路径: {}", CONFIG_DIR);
+        NeoLinkCore.onClientStarted();
     }
 }

@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 import java.nio.file.Path;
 
 /**
- * NeoForge loader bridge; all real NeoLink behavior is delegated to common.
+ * NeoForge loader 桥接层；所有真实 NeoLink 行为都委托给 common。
  */
 @Mod(NeoLinkCore.MOD_ID)
 public final class NeoLinkMC {

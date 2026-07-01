@@ -9,8 +9,8 @@
     "Ceroxe"
   ],
   "contact": {
-    "homepage": "https://github.com/CeroxeAnivie/NeoLinkMC.git",
-    "sources": "https://github.com/CeroxeAnivie/NeoLinkMC.git"
+    "homepage": "https://github.com/NeoProxy/NeoLinkMC",
+    "sources": "https://github.com/NeoProxy/NeoLinkMC"
   },
   "license": "MIT",
   "icon": "assets/neolinkmc/icon.png",
@@ -30,9 +30,8 @@
     "neolinkmc.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.16.0",
-    "minecraft": "26.1",
-    "java": ">=${java_version}",
-    "fabric-api": "*"
+    "fabricloader": "${loader_version_range}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}"
   }
 }

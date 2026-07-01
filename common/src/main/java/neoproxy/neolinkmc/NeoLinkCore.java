@@ -11,12 +11,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * Loader-neutral NeoLinkMC lifecycle.
+ * Loader-neutral 的 NeoLinkMC 生命周期。
  *
- * <p>Fabric, Forge, and NeoForge differ in event buses and metadata formats,
- * but the tunnel lifecycle must remain identical. Keeping that behavior here
- * prevents subtle platform drift such as one loader validating ports differently
- * or forgetting to stop the tunnel when a singleplayer server closes.</p>
+ * <p>Fabric、Forge 与 NeoForge 的 event bus 和 metadata 格式各不相同，但 tunnel
+ * 生命周期必须完全一致。将这部分行为收敛到这里，可以避免细微的平台漂移，
+ * 例如某个 loader 使用不同端口校验规则，或在单人 server 关闭时忘记停止 tunnel。</p>
  */
 public final class NeoLinkCore {
     public static final String MOD_ID = "neolinkmc";

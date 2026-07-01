@@ -18,11 +18,11 @@ import org.slf4j.Logger;
 import java.nio.file.Path;
 
 /**
- * Forge loader bridge.
+ * Forge loader 桥接层。
  *
- * <p>Forge-specific code stays here: metadata lookup, config directory
- * discovery, and event bus registration. Tunnel lifecycle and validation live
- * in {@link NeoLinkCore} so Forge, NeoForge, and Fabric cannot drift.</p>
+ * <p>Forge 专属代码只保留在这里：metadata 查询、配置目录发现以及 event bus 注册。
+ * Tunnel 生命周期和校验逻辑由 {@link NeoLinkCore} 统一承载，避免 Forge、NeoForge
+ * 与 Fabric 之间出现行为漂移。</p>
  */
 @Mod(NeoLinkCore.MOD_ID)
 @Mod.EventBusSubscriber(modid = NeoLinkCore.MOD_ID, value = Dist.CLIENT)

@@ -4,12 +4,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * Process-wide platform registry used by shared code.
+ * 共享代码使用的进程级 platform registry。
  *
- * <p>Minecraft loaders initialize mods very early and with different entrypoint
- * types. A tiny explicit holder keeps common code deterministic: every platform
- * must register before config or lifecycle code runs, and failures are reported
- * at the real source instead of being hidden behind a null path later.</p>
+ * <p>Minecraft loaders 会在很早期初始化 mods，并且 entrypoint 类型各不相同。
+ * 这个极小的显式 holder 让 common 代码保持确定性：每个平台都必须在配置或生命周期
+ * 代码运行前完成注册，故障也会在真正的源头暴露，而不是之后被隐藏在 null path 后面。</p>
  */
 public final class NeoLinkPlatformHolder {
     private static volatile NeoLinkPlatform platform;

@@ -5,28 +5,36 @@ import top.ceroxe.api.neolink.NeoLinkAPI;
 import top.ceroxe.api.neolink.NeoLinkCfg;
 import top.ceroxe.api.neolink.NeoLinkState;
 
-import java.io.IOException;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Shared tunnel lifecycle adapter for all NeoLinkMC platform modules.
+ * Loader-neutral adapter for the NeoLink tunnel lifecycle.
  *
- * <p>NeoLinkAPI is the single source of truth for the protocol, heartbeat,
- * transfer workers, TCP/UDP dispatch and resource cleanup. This adapter keeps
- * Minecraft-facing behavior stable while preventing each loader/version module
- * from re-implementing socket orchestration.</p>
+ * <p>The API object owns the actual networking workers. This adapter keeps Minecraft-facing
+ * state transitions deterministic, so loader modules do not need to duplicate socket or
+ * shutdown orchestration.</p>
  */
 public final class ConnectionService implements AutoCloseable {
     private static final int DEFAULT_CONNECT_TIMEOUT_MILLIS = 5_000;
+    private static final double LOW_TRAFFIC_REMAINING_MIB = 100.0D;
+    private static final Pattern TRAFFIC_QUOTA_PATTERN = Pattern.compile(
+            "这个密钥有\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(MiB|MIB|MB|GiB|GIB|GB)\\s*流量可以消耗",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final MessageHandler messageHandler;
     private final AtomicBoolean startingOrRunning = new AtomicBoolean(false);
 
-    private volatile NeoLinkAPI api;
+    private volatile NeoLinkAPI client;
     private volatile ConnectionConfig config;
     private volatile Thread workerThread;
-    private volatile NeoLinkState state = NeoLinkState.STOPPED;
+    private volatile TunnelState state = TunnelState.STOPPED;
+    private volatile boolean stopRequested;
+    private volatile boolean trafficQuotaMessageSent;
 
     public ConnectionService(MessageHandler messageHandler) {
         this.messageHandler = Objects.requireNonNull(messageHandler, "messageHandler");
@@ -39,19 +47,36 @@ public final class ConnectionService implements AutoCloseable {
             return;
         }
 
-        this.config = nextConfig;
-        NeoLinkAPI nextApi = createApi(nextConfig);
-        this.api = nextApi;
+        config = nextConfig;
+        stopRequested = false;
+        trafficQuotaMessageSent = false;
+        state = TunnelState.STARTING;
 
-        workerThread = new Thread(() -> runTunnel(nextApi), "NeoLinkMC-Tunnel");
-        workerThread.setDaemon(true);
-        workerThread.start();
+        try {
+            NeoLinkAPI nextClient = createClient(nextConfig);
+            client = nextClient;
+
+            workerThread = new Thread(() -> runTunnel(nextClient), "NeoLinkMC-Tunnel");
+            workerThread.setDaemon(true);
+            workerThread.start();
+        } catch (RuntimeException e) {
+            state = TunnelState.FAILED;
+            startingOrRunning.set(false);
+            client = null;
+            workerThread = null;
+            onError("Failed to initialize NeoLink tunnel.", e);
+        }
     }
 
     public void stop() {
-        NeoLinkAPI activeApi = api;
-        if (activeApi != null) {
-            activeApi.close();
+        stopRequested = true;
+        if (startingOrRunning.get()) {
+            state = TunnelState.STOPPING;
+        }
+
+        NeoLinkAPI activeClient = client;
+        if (activeClient != null) {
+            activeClient.close();
         }
 
         Thread activeWorker = workerThread;
@@ -60,107 +85,213 @@ public final class ConnectionService implements AutoCloseable {
         }
     }
 
-    public boolean isRunning() {
-        NeoLinkState currentState = state;
-        return startingOrRunning.get()
-                && (currentState == NeoLinkState.STARTING || currentState == NeoLinkState.RUNNING);
+    public boolean awaitStopped(long timeout, TimeUnit unit) {
+        Objects.requireNonNull(unit, "unit");
+        Thread activeWorker = workerThread;
+        if (activeWorker == null || Thread.currentThread() == activeWorker) {
+            return true;
+        }
+
+        try {
+            activeWorker.join(unit.toMillis(timeout));
+            return !activeWorker.isAlive();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
-    public NeoLinkState getState() {
+    public boolean isRunning() {
+        TunnelState currentState = state;
+        return startingOrRunning.get()
+                && (currentState == TunnelState.STARTING || currentState == TunnelState.RUNNING);
+    }
+
+    public TunnelState getState() {
         return state;
     }
 
-    private NeoLinkAPI createApi(ConnectionConfig source) {
+    private NeoLinkAPI createClient(ConnectionConfig nextConfig) {
         NeoLinkCfg apiConfig = new NeoLinkCfg(
-                source.remoteDomain(),
-                source.hookPort(),
-                source.hostConnectPort(),
-                source.key(),
-                source.localPort()
+                nextConfig.remoteDomain(),
+                nextConfig.hookPort(),
+                nextConfig.hostConnectPort(),
+                nextConfig.key(),
+                nextConfig.localPort()
         )
-                .setLocalDomainName(source.localDomain())
+                .setLocalDomainName(nextConfig.localDomain())
                 .setLanguage(NeoLinkCfg.ZH_CH)
                 .setTCPEnabled(true)
                 .setUDPEnabled(false);
 
+        messageHandler.log(
+                "NeoLink runtime config: remote=" + nextConfig.remoteDomain()
+                        + ", hookPort=" + nextConfig.hookPort()
+                        + ", hostConnectPort=" + nextConfig.hostConnectPort()
+                        + ", localDomain=" + nextConfig.localDomain()
+                        + ", localPort=" + nextConfig.localPort()
+                        + ", key=" + describeKey(nextConfig.key())
+                        + ", tcp=true, udp=false",
+                MessageHandler.LogLevel.INFO
+        );
+
         return new NeoLinkAPI(apiConfig)
-                .setOnStateChanged(this::onStateChanged)
+                .setOnStateChanged(apiState -> onStateChanged(toTunnelState(apiState)))
                 .setOnServerMessage(this::onServerMessage)
                 .setOnError(this::onError)
                 .setOnConnect((protocol, sourceAddress, targetAddress) ->
-                        messageHandler.log(
-                                protocol + " connection " + sourceAddress + " -> " + targetAddress + " established.",
-                                MessageHandler.LogLevel.INFO
+                        onConnect(
+                                String.valueOf(protocol),
+                                String.valueOf(sourceAddress),
+                                String.valueOf(targetAddress)
                         ))
                 .setOnDisconnect((protocol, sourceAddress, targetAddress) ->
-                        messageHandler.log(
-                                protocol + " connection " + sourceAddress + " -> " + targetAddress + " closed.",
-                                MessageHandler.LogLevel.INFO
+                        onDisconnect(
+                                String.valueOf(protocol),
+                                String.valueOf(sourceAddress),
+                                String.valueOf(targetAddress)
                         ))
-                .setDebugSink((message, cause) -> {
-                    if (message != null) {
-                        messageHandler.log(message, MessageHandler.LogLevel.DEBUG);
-                    }
-                    if (cause != null) {
-                        messageHandler.log("NeoLinkAPI debug exception", MessageHandler.LogLevel.DEBUG, cause);
-                    }
-                });
+                .setDebugSink(this::onDebug);
+    }
+
+    private static String describeKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "blank";
+        }
+        if (ConnectionConfig.DEFAULT_KEY.equals(key)) {
+            return "default(" + ConnectionConfig.DEFAULT_KEY.length() + " chars)";
+        }
+        return "custom(" + key.length() + " chars)";
+    }
+
+    private static TunnelState toTunnelState(NeoLinkState state) {
+        return switch (state) {
+            case STARTING -> TunnelState.STARTING;
+            case RUNNING -> TunnelState.RUNNING;
+            case STOPPING -> TunnelState.STOPPING;
+            case FAILED -> TunnelState.FAILED;
+            case STOPPED -> TunnelState.STOPPED;
+        };
     }
 
     private void runTunnel(NeoLinkAPI tunnel) {
         try {
-            messageHandler.send("NeoLinkMC 客户端启动中...", MessageHandler.MessageType.INFO);
+            messageHandler.log("NeoLinkMC client is starting.", MessageHandler.LogLevel.INFO);
+            messageHandler.send("正在启动 NeoLinkMC 客户端...", MessageHandler.MessageType.INFO);
             tunnel.start(DEFAULT_CONNECT_TIMEOUT_MILLIS);
         } catch (Exception e) {
             if (startingOrRunning.get()) {
-                onError("内网穿透服务启动或运行失败。", e);
+                state = stopRequested ? TunnelState.STOPPED : TunnelState.FAILED;
+                onError("NeoLink tunnel failed while starting or running.", e);
             }
         } finally {
-            state = NeoLinkState.STOPPED;
+            if (state != TunnelState.FAILED || stopRequested) {
+                state = TunnelState.STOPPED;
+            }
             startingOrRunning.set(false);
-            api = null;
+            client = null;
             workerThread = null;
-            messageHandler.send("内网穿透服务已停止", MessageHandler.MessageType.INFO);
+            messageHandler.log("NeoLink tunnel has stopped.", MessageHandler.LogLevel.INFO);
+            messageHandler.send("NeoLink 隧道已停止。", MessageHandler.MessageType.INFO);
         }
     }
 
-    private void onStateChanged(NeoLinkState nextState) {
+    public void onStateChanged(TunnelState nextState) {
         state = nextState;
+        messageHandler.log("NeoLink tunnel state changed: " + nextState, MessageHandler.LogLevel.INFO);
         switch (nextState) {
             case STARTING -> {
                 ConnectionConfig activeConfig = config;
                 if (activeConfig != null) {
                     messageHandler.send(
-                            "正在连接到 " + activeConfig.remoteDomain() + "...",
+                            "正在连接 " + activeConfig.remoteDomain() + "...",
                             MessageHandler.MessageType.INFO
                     );
                 }
             }
-            case RUNNING -> messageHandler.send("内网穿透服务已启动", MessageHandler.MessageType.SUCCESS);
-            case STOPPING -> messageHandler.send("正在停止内网穿透服务...", MessageHandler.MessageType.INFO);
-            case FAILED -> messageHandler.send("内网穿透服务异常停止", MessageHandler.MessageType.ERROR);
+            case RUNNING -> messageHandler.send("NeoLink 隧道已连接。", MessageHandler.MessageType.SUCCESS);
+            case STOPPING -> messageHandler.send("正在停止 NeoLink 隧道...", MessageHandler.MessageType.INFO);
+            case FAILED -> messageHandler.send("NeoLink 隧道异常断开。", MessageHandler.MessageType.ERROR);
             case STOPPED -> {
             }
         }
     }
 
-    private void onServerMessage(String message) {
+    public void onServerMessage(String message) {
         if (message == null || message.isBlank()) {
             return;
         }
-        MessageHandler.MessageType type = message.contains("消耗") || message.contains("流量")
-                ? MessageHandler.MessageType.WARNING
-                : MessageHandler.MessageType.INFO;
-        messageHandler.send(message, type);
+        messageHandler.log("NeoLink server message: " + message, MessageHandler.LogLevel.INFO);
+        if (isTrafficQuotaMessage(message)) {
+            if (shouldShowTrafficQuotaInChat(message)) {
+                messageHandler.send(message, MessageHandler.MessageType.WARNING);
+            }
+            return;
+        }
+        messageHandler.send(message, MessageHandler.MessageType.INFO);
     }
 
-    private void onError(String message, Throwable cause) {
+    public void onError(String message, Throwable cause) {
         String detail = cause == null || cause.getMessage() == null ? message : message + " " + cause.getMessage();
-        messageHandler.send(detail, MessageHandler.MessageType.ERROR);
-        if (cause instanceof IOException) {
-            messageHandler.log(detail, MessageHandler.LogLevel.ERROR);
-        } else if (cause != null) {
+        messageHandler.send(summarizeErrorForChat(message, cause), MessageHandler.MessageType.ERROR);
+        if (cause != null) {
             messageHandler.log(detail, MessageHandler.LogLevel.ERROR, cause);
+        }
+    }
+
+    private boolean shouldShowTrafficQuotaInChat(String message) {
+        Double remainingMiB = parseRemainingTrafficMiB(message);
+        if (!trafficQuotaMessageSent) {
+            trafficQuotaMessageSent = true;
+            return true;
+        }
+        return remainingMiB != null && remainingMiB <= LOW_TRAFFIC_REMAINING_MIB;
+    }
+
+    private static boolean isTrafficQuotaMessage(String message) {
+        return TRAFFIC_QUOTA_PATTERN.matcher(message).find();
+    }
+
+    private static Double parseRemainingTrafficMiB(String message) {
+        Matcher matcher = TRAFFIC_QUOTA_PATTERN.matcher(message);
+        if (!matcher.find()) {
+            return null;
+        }
+        double amount = Double.parseDouble(matcher.group(1));
+        String unit = matcher.group(2).toUpperCase();
+        return unit.startsWith("G") ? amount * 1024.0D : amount;
+    }
+
+    private static String summarizeErrorForChat(String message, Throwable cause) {
+        String causeMessage = cause == null ? null : cause.getMessage();
+        if (causeMessage == null || causeMessage.isBlank()) {
+            return "NeoLink 连接失败，完整异常已写入日志。";
+        }
+        return "NeoLink 连接失败：" + causeMessage + "。完整异常已写入日志。";
+    }
+
+    public void onConnect(String protocol, String sourceAddress, String targetAddress) {
+        messageHandler.log(
+                protocol + " connection " + sourceAddress + " -> " + targetAddress + " established.",
+                MessageHandler.LogLevel.INFO
+        );
+    }
+
+    public void onDisconnect(String protocol, String sourceAddress, String targetAddress) {
+        messageHandler.log(
+                protocol + " connection " + sourceAddress + " -> " + targetAddress + " closed.",
+                MessageHandler.LogLevel.INFO
+        );
+    }
+
+    public void onDebug(String message, Throwable cause) {
+        if (cause != null) {
+            String detail = message == null || message.isBlank() ? "NeoLinkAPI debug exception" : message;
+            messageHandler.log(detail, MessageHandler.LogLevel.DEBUG, cause);
+            return;
+        }
+        if (message != null) {
+            messageHandler.log(message, MessageHandler.LogLevel.DEBUG);
         }
     }
 
