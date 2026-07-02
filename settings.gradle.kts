@@ -116,6 +116,13 @@ fun requestedModuleNames(loader: String, allModules: List<String>, defaultModule
     }
 }
 
+fun includeLoaderModule(loader: String, module: String) {
+    include("$loader:$module")
+    project(":$loader:$module").projectDir = file("$loader/$module").apply {
+        mkdirs()
+    }
+}
+
 val fabricModules = listOf(
     "v1_20",
     "v1_20_1",
@@ -165,13 +172,13 @@ val neoForgeModules = listOf(
 requestedModuleNames("fabric", fabricModules, defaultSyncModules.getValue("fabric")).takeIf { it.isNotEmpty() }?.let { modules ->
     include("fabric")
     modules.forEach { module ->
-        include("fabric:$module")
+        includeLoaderModule("fabric", module)
     }
 }
 
 requestedModuleNames("neoforge", neoForgeModules, defaultSyncModules.getValue("neoforge")).takeIf { it.isNotEmpty() }?.let { modules ->
     include("neoforge")
     modules.forEach { module ->
-        include("neoforge:$module")
+        includeLoaderModule("neoforge", module)
     }
 }
