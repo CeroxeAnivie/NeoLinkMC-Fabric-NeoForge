@@ -123,7 +123,9 @@ val fabricModules = listOf(
     FabricModuleSpec("v26_1", "26.1", "0.19.3", "0.145.1+26.1", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false),
     FabricModuleSpec("v26_1_1", "26.1.1", "0.19.3", "0.145.4+26.1.1", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false),
     FabricModuleSpec("v26_1_2", "26.1.2", "0.19.3", "0.153.0+26.1.2", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false),
-    FabricModuleSpec("v26_2", "26.2", "0.19.3", "0.153.0+26.2", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false)
+    // 26.2 的“开放局域网”界面已从 ShareToLanScreen 改为 MultiplayerOptionsScreen，
+    // 不能复用 v26_1 兼容模板。
+    FabricModuleSpec("v26_2", "26.2", "0.19.3", "0.153.0+26.2", 25, "v26_2", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false)
 )
 
 val neoForgeModules = listOf(
@@ -143,7 +145,9 @@ val neoForgeModules = listOf(
     NeoForgeModuleSpec("v26_1", "26.1", "26.1.0.19-beta", 25, sourceTemplate = "v26_1"),
     NeoForgeModuleSpec("v26_1_1", "26.1.1", "26.1.1.15-beta", 25, sourceTemplate = "v26_1"),
     NeoForgeModuleSpec("v26_1_2", "26.1.2", "26.1.2.76", 25, sourceTemplate = "v26_1"),
-    NeoForgeModuleSpec("v26_2", "26.2", "26.2.0.7-beta", 25, sourceTemplate = "v26_1")
+    // 26.2 的“开放局域网”界面已从 ShareToLanScreen 改为 MultiplayerOptionsScreen，
+    // 不能复用 v26_1 兼容模板。
+    NeoForgeModuleSpec("v26_2", "26.2", "26.2.0.7-beta", 25, sourceTemplate = "v26_2")
 )
 
 fun shouldConfigureLoaderModule(projectPath: String, rootPath: String): Boolean {

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "neolinkmc",
+  "version": "${version}",
+  "name": "NeoLinkMC",
+  "description": "NeoLinkMC Minecraft 内网穿透客户端 Mod",
+  "authors": [
+    "M.T.S. Studio",
+    "Ceroxe"
+  ],
+  "contact": {
+    "homepage": "https://github.com/NeoProxy/NeoLinkMC",
+    "sources": "https://github.com/NeoProxy/NeoLinkMC"
+  },
+  "license": "MIT",
+  "icon": "assets/neolinkmc/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "neoproxy.neolinkmc.NeoLinkMC"
+    ],
+    "client": [
+      "neoproxy.neolinkmc.NeoLinkMC"
+    ]
+  },
+  "mixins": [
+    "neolinkmc.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "${loader_version_range}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}"
+  }
+}
