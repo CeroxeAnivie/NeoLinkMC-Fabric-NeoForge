@@ -158,18 +158,10 @@ fun shouldConfigureLoaderModule(projectPath: String, rootPath: String): Boolean 
 
 fun Project.configureJavaCompilerRelease(javaVersion: Int) {
     extensions.configure<JavaPluginExtension> {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(javaVersion))
-        }
         sourceCompatibility = JavaVersion.toVersion(javaVersion)
         targetCompatibility = JavaVersion.toVersion(javaVersion)
     }
-
-    val toolchains = extensions.getByType<JavaToolchainService>()
     tasks.withType<JavaCompile>().configureEach {
-        javaCompiler.set(toolchains.compilerFor {
-            languageVersion.set(JavaLanguageVersion.of(javaVersion))
-        })
         options.encoding = "UTF-8"
         options.release.set(javaVersion)
     }
@@ -317,7 +309,6 @@ fun Project.addBundledNeoLinkDependencies(bundleConfigurationName: String) {
     }
 
     tasks.named<Jar>("jar") {
-        dependsOn(bundle)
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         exclude(
             "module-info.class",
@@ -335,8 +326,10 @@ fun Project.addBundledNeoLinkDependencies(bundleConfigurationName: String) {
             "META-INF/native-image/**",
             "META-INF/maven/**"
         )
-        from(bundle.map { dependency ->
-            if (dependency.isDirectory) dependency else zipTree(dependency)
+        from({
+            bundle.map { dependency ->
+                if (dependency.isDirectory) dependency else zipTree(dependency)
+            }
         })
     }
 }
