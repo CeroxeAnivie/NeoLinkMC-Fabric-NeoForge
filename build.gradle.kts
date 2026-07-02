@@ -1,24 +1,33 @@
 buildscript {
+    val commonRepoPath = providers.gradleProperty("neolinkmc_common_repo").orNull
     repositories {
+        if (!commonRepoPath.isNullOrBlank()) {
+            maven {
+                url = uri(commonRepoPath)
+                content {
+                    includeGroup("top.ceroxe.neolinkmc")
+                }
+            }
+        }
         if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
             mavenLocal {
                 content {
                     includeGroup("top.ceroxe.api")
+                    includeGroup("top.ceroxe.neolinkmc")
                 }
             }
         }
         maven("https://maven.fabricmc.net/") {
             name = "Fabric"
         }
-        maven("https://maven.minecraftforge.net/") {
-            name = "Forge"
+        maven("https://maven.neoforged.net/releases") {
+            name = "NeoForge"
         }
         mavenCentral()
         gradlePluginPortal()
     }
     dependencies {
         classpath("net.fabricmc:fabric-loom:1.13.6")
-        classpath("net.minecraftforge.gradle:ForgeGradle:6.0.54")
         classpath("net.neoforged:moddev-gradle:2.0.141")
     }
 }
@@ -32,8 +41,9 @@ group = property("maven_group").toString()
 version = property("mod_version").toString()
 
 val neoLinkApiVersion = property("neolinkapi_version").toString()
+val neoLinkMcCommonVersion = property("neolinkmc_common_version").toString()
+val neoLinkMcCommonCoordinate = "top.ceroxe.neolinkmc:neolinkmc-common:$neoLinkMcCommonVersion"
 val jetbrainsAnnotationsVersion = "26.0.2"
-val junitVersion = "5.11.4"
 val requestedTasks = gradle.startParameter.taskNames
 val diagnosticRootTasks = setOf(
     "help",
@@ -61,19 +71,6 @@ data class FabricModuleSpec(
     val requiresFabricApi: Boolean = true
 ) {
     val projectPath: String = ":fabric:$moduleName"
-}
-
-data class ForgeModuleSpec(
-    val moduleName: String,
-    val minecraftVersion: String,
-    val forgeVersion: String,
-    val javaVersion: Int,
-    val sourceTemplate: String = "v1_21_8",
-    val loaderTemplate: String = "forge/template",
-    val compileRelease: Int = javaVersion,
-    val forgeVersionRange: String = forgeMajorVersionRange(forgeVersion)
-) {
-    val projectPath: String = ":forge:$moduleName"
 }
 
 data class NeoForgeModuleSpec(
@@ -111,29 +108,6 @@ val fabricModules = listOf(
     FabricModuleSpec("v26_1_1", "26.1.1", "0.19.3", "0.145.4+26.1.1", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false),
     FabricModuleSpec("v26_1_2", "26.1.2", "0.19.3", "0.153.0+26.1.2", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false),
     FabricModuleSpec("v26_2", "26.2", "0.19.3", "0.153.0+26.2", 25, "v26_1", mappingsArtifact = "gradle/mappings/minecraft-26.1-empty-named.jar", requiresFabricApi = false)
-)
-
-val forgeModules = listOf(
-    ForgeModuleSpec("v1_20", "1.20", "1.20-46.0.14", 17, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_20_1", "1.20.1", "1.20.1-47.4.20", 17, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_20_2", "1.20.2", "1.20.2-48.1.0", 17, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_20_3", "1.20.3", "1.20.3-49.0.2", 17, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_20_4", "1.20.4", "1.20.4-49.2.7", 17, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_20_6", "1.20.6", "1.20.6-50.2.8", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21", "1.21", "1.21-51.0.33", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21_1", "1.21.1", "1.21.1-52.1.14", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21_3", "1.21.3", "1.21.3-53.1.10", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21_4", "1.21.4", "1.21.4-54.1.16", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21_5", "1.21.5", "1.21.5-55.1.10", 21, loaderTemplate = "forge/template_legacy"),
-    ForgeModuleSpec("v1_21_6", "1.21.6", "1.21.6-56.0.9", 21),
-    ForgeModuleSpec("v1_21_7", "1.21.7", "1.21.7-57.0.3", 21),
-    ForgeModuleSpec("v1_21_8", "1.21.8", "1.21.8-58.1.18", 21),
-    ForgeModuleSpec("v1_21_9", "1.21.9", "1.21.9-59.0.5", 21),
-    ForgeModuleSpec("v1_21_10", "1.21.10", "1.21.10-60.1.9", 21),
-    ForgeModuleSpec("v26_1", "26.1", "26.1-62.0.9", 25),
-    ForgeModuleSpec("v26_1_1", "26.1.1", "26.1.1-63.0.2", 25),
-    ForgeModuleSpec("v26_1_2", "26.1.2", "26.1.2-64.0.11", 25),
-    ForgeModuleSpec("v26_2", "26.2", "26.2-65.0.1", 25)
 )
 
 val neoForgeModules = listOf(
@@ -232,18 +206,9 @@ fun exactMinecraftVersionRange(version: String): String {
     return "[$version,$upperBound)"
 }
 
-fun forgeMajorVersionRange(forgeVersion: String): String {
-    val loaderVersion = forgeVersion.substringAfter('-')
-    val majorVersion = loaderVersion.substringBefore('.')
-    require(majorVersion.toIntOrNull() != null) { "Unsupported Forge version: $forgeVersion" }
-
-    return "[$majorVersion,)"
-}
-
 fun neoForgeMajorVersionRange(neoForgeVersion: String): String {
     val majorVersion = neoForgeVersion.substringBefore('.')
     require(majorVersion.toIntOrNull() != null) { "Unsupported NeoForge version: $neoForgeVersion" }
-
     return "[$majorVersion,)"
 }
 
@@ -258,17 +223,24 @@ subprojects {
     version = rootProject.version
 
     repositories {
+        val commonRepoPath = rootProject.providers.gradleProperty("neolinkmc_common_repo").orNull
+        if (!commonRepoPath.isNullOrBlank()) {
+            maven {
+                url = uri(commonRepoPath)
+                content {
+                    includeGroup("top.ceroxe.neolinkmc")
+                }
+            }
+        }
         if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
             mavenLocal {
                 content {
                     includeGroup("top.ceroxe.api")
+                    includeGroup("top.ceroxe.neolinkmc")
                 }
             }
         }
         mavenCentral()
-        maven("https://maven.minecraftforge.net/") {
-            name = "Forge"
-        }
         maven("https://maven.neoforged.net/releases") {
             name = "NeoForge"
         }
@@ -291,38 +263,12 @@ subprojects {
     }
 }
 
-project(":common") {
-    apply(plugin = "java-library")
-
-    configureJavaCompilerRelease(17)
-
-    dependencies {
-        "implementation"("top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion") {
-            exclude(group = "org.slf4j", module = "slf4j-nop")
-            exclude(group = "com.google.code.gson", module = "gson")
-        }
-        "compileOnly"("com.google.code.gson:gson:2.10.1")
-        "compileOnly"("org.slf4j:slf4j-api:2.0.16")
-        "compileOnly"("org.jetbrains:annotations:$jetbrainsAnnotationsVersion")
-        "testImplementation"("org.junit.jupiter:junit-jupiter:$junitVersion")
-        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
-    }
-
-    tasks.withType<Test>().configureEach {
-        useJUnitPlatform()
-    }
-}
-
 findProject(":fabric")?.tasks?.named<Jar>("jar") {
-        enabled = false
-    }
-
-listOf(":forge", ":neoforge").forEach { loaderRoot ->
-    findProject(loaderRoot)?.let { project ->
-        project.tasks.named<Jar>("jar") {
-            enabled = false
-        }
+    enabled = false
 }
+
+findProject(":neoforge")?.tasks?.named<Jar>("jar") {
+    enabled = false
 }
 
 fun Project.addSharedMinecraftTemplate(sourceTemplate: String, loaderTemplate: String) {
@@ -361,8 +307,8 @@ fun Project.addBundledNeoLinkDependencies(bundleConfigurationName: String) {
     }
 
     dependencies {
-        add("implementation", project(":common"))
-        add(bundle.name, project(":common"))
+        add("implementation", neoLinkMcCommonCoordinate)
+        add(bundle.name, neoLinkMcCommonCoordinate)
         add(bundle.name, "top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion") {
             isTransitive = false
             exclude(group = "org.slf4j", module = "slf4j-nop")
@@ -443,8 +389,8 @@ fun Project.configureFabricModule(spec: FabricModuleSpec) {
             add("modImplementation", "net.fabricmc.fabric-api:fabric-api:${spec.fabricVersion}")
         }
         add("compileOnly", "org.jetbrains:annotations:$jetbrainsAnnotationsVersion")
-        add("implementation", project(":common"))
-        add("include", project(":common"))
+        add("implementation", neoLinkMcCommonCoordinate)
+        add("include", neoLinkMcCommonCoordinate)
         add("implementation", "top.ceroxe.api:neolinkapi-desktop:$neoLinkApiVersion") {
             exclude(group = "org.slf4j", module = "slf4j-nop")
             exclude(group = "com.google.code.gson", module = "gson")
@@ -495,77 +441,6 @@ fabricModules.forEach { spec ->
     findProject(spec.projectPath)?.run {
         if (shouldConfigureLoaderModule(path, ":fabric")) {
             configureFabricModule(spec)
-        }
-    }
-}
-
-fun Project.configureForgeModule(spec: ForgeModuleSpec) {
-    apply(plugin = "net.minecraftforge.gradle")
-    apply(plugin = "maven-publish")
-
-    version = rootProject.version
-
-    configureJavaCompilerRelease(spec.javaVersion)
-    tasks.withType<JavaCompile>().configureEach {
-        options.release.set(spec.compileRelease)
-    }
-    configurations.configureEach {
-        if (isCanBeResolved) {
-            attributes.attribute(
-                org.gradle.api.attributes.java.TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE,
-                spec.javaVersion
-            )
-        }
-    }
-
-    addSharedMinecraftTemplate(spec.sourceTemplate, spec.loaderTemplate)
-    addBundledNeoLinkDependencies("forgeBundle")
-    disableEmptyLoaderTests()
-
-    val archivesBaseName = rootProject.property("archives_base_name").toString()
-    base {
-        archivesName.set("$archivesBaseName-Forge-${spec.minecraftVersion}")
-    }
-
-    extensions.configure<net.minecraftforge.gradle.userdev.UserDevExtension>("minecraft") {
-        mappings("official", spec.minecraftVersion)
-    }
-
-    dependencies {
-        add("minecraft", "net.minecraftforge:forge:${spec.forgeVersion}")
-        add("compileOnly", "org.jetbrains:annotations:$jetbrainsAnnotationsVersion")
-    }
-
-    val resourceProperties = mapOf(
-        "version" to version.toString(),
-        "minecraft_version" to spec.minecraftVersion,
-        "minecraft_version_range" to exactMinecraftVersionRange(spec.minecraftVersion),
-        "loader_version_range" to "[${spec.forgeVersion.substringAfter('-').substringBefore('.')},)",
-        "forge_version_range" to spec.forgeVersionRange,
-        "mixin_compatibility_level" to mixinCompatibilityLevel(spec.compileRelease)
-    )
-
-    tasks.named<ProcessResources>("processResources") {
-        inputs.properties(resourceProperties)
-        filesMatching(listOf("META-INF/mods.toml", "neolinkmc.mixins.json")) {
-            expand(resourceProperties)
-        }
-    }
-
-    tasks.named<Jar>("jar") {
-        from(rootProject.file("LICENSE")) {
-            rename { "${it}_$archivesBaseName" }
-        }
-        manifest.attributes(
-            "MixinConfigs" to "neolinkmc.mixins.json"
-        )
-    }
-}
-
-forgeModules.forEach { spec ->
-    findProject(spec.projectPath)?.run {
-        if (shouldConfigureLoaderModule(path, ":forge")) {
-            configureForgeModule(spec)
         }
     }
 }

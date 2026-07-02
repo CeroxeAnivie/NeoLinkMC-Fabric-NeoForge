@@ -1,13 +1,22 @@
 pluginManagement {
+    val commonRepoPath = providers.gradleProperty("neolinkmc_common_repo").orNull
     repositories {
-        maven("https://maven.minecraftforge.net/") {
-            name = "Forge"
+        if (!commonRepoPath.isNullOrBlank()) {
+            maven {
+                url = uri(commonRepoPath)
+                content {
+                    includeGroup("top.ceroxe.neolinkmc")
+                }
+            }
         }
         maven("https://maven.neoforged.net/releases") {
             name = "NeoForge"
         }
         maven("https://maven.fabricmc.net/") {
             name = "Fabric"
+        }
+        if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
+            mavenLocal()
         }
         mavenCentral()
         gradlePluginPortal()
@@ -17,17 +26,19 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
-        if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
-            mavenLocal {
+        val commonRepoPath = providers.gradleProperty("neolinkmc_common_repo").orNull
+        if (!commonRepoPath.isNullOrBlank()) {
+            maven {
+                url = uri(commonRepoPath)
                 content {
-                    includeGroup("top.ceroxe.api")
+                    includeGroup("top.ceroxe.neolinkmc")
                 }
             }
         }
-        mavenCentral()
-        maven("https://maven.minecraftforge.net/") {
-            name = "Forge"
+        if (providers.gradleProperty("useMavenLocal").map(String::toBoolean).orElse(false).get()) {
+            mavenLocal()
         }
+        mavenCentral()
         maven("https://maven.neoforged.net/releases") {
             name = "NeoForge"
         }
@@ -40,13 +51,21 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NeoLinkMC"
+rootProject.name = "NeoLinkMC-Fabric-NeoForge"
 
 val requestedTasks = gradle.startParameter.taskNames
 val defaultSyncModules = mapOf(
-    "fabric" to listOf("v1_21_8"),
-    "forge" to emptyList<String>(),
-    "neoforge" to emptyList()
+    "fabric" to listOf(
+        "v1_20", "v1_20_1", "v1_20_2", "v1_20_3", "v1_20_4", "v1_20_5", "v1_20_6",
+        "v1_21", "v1_21_1", "v1_21_2", "v1_21_3", "v1_21_4", "v1_21_5", "v1_21_6",
+        "v1_21_7", "v1_21_8", "v1_21_9", "v1_21_10", "v1_21_11",
+        "v26_1", "v26_1_1", "v26_1_2", "v26_2"
+    ),
+    "neoforge" to listOf(
+        "v1_20_4", "v1_20_6", "v1_21", "v1_21_1", "v1_21_2", "v1_21_3",
+        "v1_21_4", "v1_21_5", "v1_21_6", "v1_21_8", "v1_21_9", "v1_21_10",
+        "v1_21_11", "v26_1", "v26_1_1", "v26_1_2", "v26_2"
+    )
 )
 val diagnosticRootTasks = setOf(
     "help",
@@ -97,8 +116,6 @@ fun requestedModuleNames(loader: String, allModules: List<String>, defaultModule
     }
 }
 
-include("common")
-
 val fabricModules = listOf(
     "v1_20",
     "v1_20_1",
@@ -119,29 +136,6 @@ val fabricModules = listOf(
     "v1_21_9",
     "v1_21_10",
     "v1_21_11",
-    "v26_1",
-    "v26_1_1",
-    "v26_1_2",
-    "v26_2"
-)
-
-val forgeModules = listOf(
-    "v1_20",
-    "v1_20_1",
-    "v1_20_2",
-    "v1_20_3",
-    "v1_20_4",
-    "v1_20_6",
-    "v1_21",
-    "v1_21_1",
-    "v1_21_3",
-    "v1_21_4",
-    "v1_21_5",
-    "v1_21_6",
-    "v1_21_7",
-    "v1_21_8",
-    "v1_21_9",
-    "v1_21_10",
     "v26_1",
     "v26_1_1",
     "v26_1_2",
@@ -172,13 +166,6 @@ requestedModuleNames("fabric", fabricModules, defaultSyncModules.getValue("fabri
     include("fabric")
     modules.forEach { module ->
         include("fabric:$module")
-    }
-}
-
-requestedModuleNames("forge", forgeModules, defaultSyncModules.getValue("forge")).takeIf { it.isNotEmpty() }?.let { modules ->
-    include("forge")
-    modules.forEach { module ->
-        include("forge:$module")
     }
 }
 

@@ -8,14 +8,6 @@
         <option name="distributionType" value="WRAPPED" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="gradleJvm" value="zulu-21" />
-        <option name="modules">
-          <set>
-            <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/common" />
-            <option value="$PROJECT_DIR$/fabric" />
-            <option value="$PROJECT_DIR$/fabric/v1_21_8" />
-          </set>
-        </option>
         <option name="resolveExternalAnnotations" value="true" />
       </GradleProjectSettings>
     </option>
