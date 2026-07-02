@@ -2,8 +2,6 @@ package neoproxy.neolinkmc;
 
 import neoproxy.neolinkmc.service.ConnectionService;
 import neoproxy.neolinkmc.service.MinecraftMessageHandler;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.server.IntegratedServer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
@@ -80,14 +78,32 @@ public final class NeoLinkMC {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        NeoLinkCore.onServerStopping(event.getServer() instanceof IntegratedServer);
+        NeoLinkCore.onServerStopping(isIntegratedServer(event.getServer()));
     }
 
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        Minecraft client = Minecraft.getInstance();
-        if (client.hasSingleplayerServer() || (client.getCurrentServer() != null && client.isLocalServer())) {
+        if (isLocalClientConnection()) {
             NeoLinkCore.onLocalPlayDisconnect();
+        }
+    }
+
+    private static boolean isIntegratedServer(Object server) {
+        return server != null && "net.minecraft.client.server.IntegratedServer".equals(server.getClass().getName());
+    }
+
+    private static boolean isLocalClientConnection() {
+        try {
+            Class<?> minecraftClass = Class.forName("net.minecraft.client.Minecraft");
+            Object client = minecraftClass.getMethod("getInstance").invoke(null);
+            if (Boolean.TRUE.equals(minecraftClass.getMethod("hasSingleplayerServer").invoke(client))) {
+                return true;
+            }
+            Object currentServer = minecraftClass.getMethod("getCurrentServer").invoke(client);
+            return currentServer != null && Boolean.TRUE.equals(minecraftClass.getMethod("isLocalServer").invoke(client));
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOGGER.debug("Skipping client-only local disconnect check outside a Minecraft client.", e);
+            return false;
         }
     }
 }

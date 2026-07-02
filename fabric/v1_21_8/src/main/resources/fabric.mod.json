@@ -14,15 +14,12 @@
   },
   "license": "MIT",
   "icon": "assets/neolinkmc/icon.png",
-  "environment": "*",
+  "environment": "client",
   "entrypoints": {
     "main": [
       "neoproxy.neolinkmc.NeoLinkMC"
     ],
     "client": [
-      "neoproxy.neolinkmc.NeoLinkMC"
-    ],
-    "server": [
       "neoproxy.neolinkmc.NeoLinkMC"
     ]
   },

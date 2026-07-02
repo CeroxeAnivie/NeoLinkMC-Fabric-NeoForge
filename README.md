@@ -1,39 +1,53 @@
-# NeoLinkMC-Fabric-NeoForge
+# NeoLinkMC Fabric / NeoForge
 
-NeoLinkMC-Fabric-NeoForge 是 NeoLinkMC 的 Fabric / NeoForge 独立仓库，负责两条 loader 入口、Minecraft 版本矩阵、资源模板和最终模组产物构建。
+NeoLinkMC 是一个面向 Minecraft 客户端的 NeoLink 内网穿透 Mod，用于把单人游戏开启的局域网世界通过 NeoLink 暴露给其他玩家连接。
 
-## 仓库职责
+本仓库维护 Fabric 与 NeoForge 版本。公共配置、隧道生命周期和连接规则由 `NeoLinkMC-Common` 提供，本仓库只负责 Minecraft 版本适配、加载器入口、资源声明、Mixin 与 GUI。
 
-- `fabric/`：Fabric loader 入口与模块矩阵
-- `neoforge/`：NeoForge loader 入口与模块矩阵
-- `minecraftCompat/`：按 Minecraft 代际拆分的共享模板代码
+## Mod 声明
 
-公共 JVM 内核已经独立到 `NeoLinkMC-Common`，当前仓库通过 Maven 制品依赖它，而不是继续内嵌 `common/` 源码。
+- Mod 名称：NeoLinkMC
+- Mod ID：`neolinkmc`
+- 运行侧：客户端
+- 支持加载器：Fabric、NeoForge
+- 核心依赖：NeoLinkAPI Desktop、NeoLinkMC Common
+- 主要用途：让房主在单人世界中打开局域网后，通过 NeoLink 隧道让外部玩家加入
 
-## 依赖仓库
+## 支持版本
 
-- `NeoLinkMC-Common`
-- `top.ceroxe.api:neolinkapi-desktop`
+Fabric 覆盖 `1.20` 到 `1.21.11`，并包含 `26.x` 兼容模块。
+
+NeoForge 覆盖 `1.20.4`、`1.20.6`、`1.21.x` 与 `26.x` 兼容模块。
+
+默认同步和代表性验证只包含轻量代表模块；完整矩阵需要显式启用：
+
+```cmd
+chcp 65001 >nul
+gradlew.bat -Pneolinkmc.fullMatrix=true tasks
+```
 
 ## 本地构建
 
-首次验证前，先在 `NeoLinkMC-Common` 仓库执行本地发布：
+先在 `NeoLinkMC-Common` 发布本地开发依赖：
 
 ```cmd
-gradlew.bat publishMavenJavaPublicationToLocalDevelopmentRepository
+chcp 65001 >nul
+cd /d ..\NeoLinkMC-Common
+gradlew.bat publishLocalDevelopmentPublicationToLocalDevelopmentRepository
 ```
 
-然后在本仓库执行：
+再回到本仓构建代表模块：
 
 ```cmd
-gradlew.bat -Pneolinkmc_common_repo=D:/Engineering/code/NeoLinkMC-Common/build/repos/local-development :fabric:v1_21_11:remapJar
-gradlew.bat -Pneolinkmc_common_repo=D:/Engineering/code/NeoLinkMC-Common/build/repos/local-development :neoforge:v26_1_2:jar
+chcp 65001 >nul
+cd /d ..\NeoLinkMC-Fabric-NeoForge
+gradlew.bat -Pneolinkmc_common_repo=..\NeoLinkMC-Common\build\repos\local-development verifyRepresentativeLoaders
 ```
 
-## 当前验证结论
+构建单个模块示例：
 
-- 热缓存 Fabric 单模块：约 `1.18s`
-- 热缓存 NeoForge 单模块：约 `1.15s`
-- 构建 JVM 上限：`4G`
-
-首次冷构建会触发 Loom / ModDev 工件生成，耗时显著高于热缓存单模块，这是工具链初始化成本，不是硬件瓶颈。
+```cmd
+chcp 65001 >nul
+gradlew.bat -Pneolinkmc_common_repo=..\NeoLinkMC-Common\build\repos\local-development :fabric:v1_21_8:remapJar
+gradlew.bat -Pneolinkmc_common_repo=..\NeoLinkMC-Common\build\repos\local-development :neoforge:v26_2:jar
+```

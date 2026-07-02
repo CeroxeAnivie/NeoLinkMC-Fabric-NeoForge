@@ -41,7 +41,9 @@ group = property("maven_group").toString()
 version = property("mod_version").toString()
 
 val neoLinkApiVersion = property("neolinkapi_version").toString()
-val neoLinkMcCommonVersion = property("neolinkmc_common_version").toString()
+val neoLinkMcCommonVersion = providers.gradleProperty("neolinkmc_common_version")
+    .orElse(providers.gradleProperty("mod_version"))
+    .get()
 val neoLinkMcCommonCoordinate = "top.ceroxe.neolinkmc:neolinkmc-common:$neoLinkMcCommonVersion"
 val jetbrainsAnnotationsVersion = "26.0.2"
 val requestedTasks = gradle.startParameter.taskNames
@@ -58,6 +60,20 @@ val diagnosticRootTasks = setOf(
 )
 val isDiagnosticOnlyRequest = requestedTasks.isNotEmpty() &&
     requestedTasks.all { taskName -> ":" !in taskName && taskName in diagnosticRootTasks }
+
+val representativeFabricModule = "v26_1_2"
+val representativeNeoForgeModule = "v26_1_2"
+val lightweightRootTasks = setOf(
+    "verifyRepresentativeFabric",
+    "verifyRepresentativeNeoForge",
+    "verifyRepresentativeLoaders"
+)
+val representativeProjectPaths = setOf(
+    ":fabric:$representativeFabricModule",
+    ":neoforge:$representativeNeoForgeModule"
+)
+val isRepresentativeOnlyRequest = requestedTasks.isNotEmpty() &&
+    requestedTasks.all { taskName -> ":" !in taskName && taskName in lightweightRootTasks }
 
 data class FabricModuleSpec(
     val moduleName: String,
@@ -137,6 +153,10 @@ fun shouldConfigureLoaderModule(projectPath: String, rootPath: String): Boolean 
 
     if (requestedTasks.isEmpty()) {
         return true
+    }
+
+    if (isRepresentativeOnlyRequest) {
+        return projectPath in representativeProjectPaths
     }
 
     val rootLevelTaskRequested = requestedTasks.any { taskName -> ":" !in taskName }
@@ -261,6 +281,24 @@ findProject(":fabric")?.tasks?.named<Jar>("jar") {
 
 findProject(":neoforge")?.tasks?.named<Jar>("jar") {
     enabled = false
+}
+
+tasks.register("verifyRepresentativeFabric") {
+    group = "verification"
+    description = "Builds the default Fabric representative module used for cold-start validation."
+    dependsOn(":fabric:$representativeFabricModule:remapJar")
+}
+
+tasks.register("verifyRepresentativeNeoForge") {
+    group = "verification"
+    description = "Builds the default NeoForge representative module used for cold-start validation."
+    dependsOn(":neoforge:$representativeNeoForgeModule:jar")
+}
+
+tasks.register("verifyRepresentativeLoaders") {
+    group = "verification"
+    description = "Builds the default Fabric and NeoForge representative modules used for cold-start validation."
+    dependsOn("verifyRepresentativeFabric", "verifyRepresentativeNeoForge")
 }
 
 fun Project.addSharedMinecraftTemplate(sourceTemplate: String, loaderTemplate: String) {

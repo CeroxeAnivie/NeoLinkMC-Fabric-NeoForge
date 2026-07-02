@@ -18,11 +18,11 @@ modId="neoforge"
 type="required"
 versionRange="${neoforge_version_range}"
 ordering="NONE"
-side="BOTH"
+side="CLIENT"
 
 [[dependencies.neolinkmc]]
 modId="minecraft"
 type="required"
 versionRange="${minecraft_version_range}"
 ordering="NONE"
-side="BOTH"
+side="CLIENT"

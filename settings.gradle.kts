@@ -56,15 +56,10 @@ rootProject.name = "NeoLinkMC-Fabric-NeoForge"
 val requestedTasks = gradle.startParameter.taskNames
 val defaultSyncModules = mapOf(
     "fabric" to listOf(
-        "v1_20", "v1_20_1", "v1_20_2", "v1_20_3", "v1_20_4", "v1_20_5", "v1_20_6",
-        "v1_21", "v1_21_1", "v1_21_2", "v1_21_3", "v1_21_4", "v1_21_5", "v1_21_6",
-        "v1_21_7", "v1_21_8", "v1_21_9", "v1_21_10", "v1_21_11",
-        "v26_1", "v26_1_1", "v26_1_2", "v26_2"
+        "v26_1_2"
     ),
     "neoforge" to listOf(
-        "v1_20_4", "v1_20_6", "v1_21", "v1_21_1", "v1_21_2", "v1_21_3",
-        "v1_21_4", "v1_21_5", "v1_21_6", "v1_21_8", "v1_21_9", "v1_21_10",
-        "v1_21_11", "v26_1", "v26_1_1", "v26_1_2", "v26_2"
+        "v26_1_2"
     )
 )
 val diagnosticRootTasks = setOf(
@@ -78,10 +73,21 @@ val diagnosticRootTasks = setOf(
     "model",
     "wrapper"
 )
+val lightweightRootTasks = setOf(
+    "verifyRepresentativeFabric",
+    "verifyRepresentativeNeoForge",
+    "verifyRepresentativeLoaders"
+)
 val isDefaultSyncRequest = requestedTasks.isEmpty() ||
     requestedTasks.all { taskName -> ":" !in taskName && taskName in diagnosticRootTasks }
+val isRepresentativeSyncRequest = requestedTasks.isNotEmpty() &&
+    requestedTasks.all { taskName -> ":" !in taskName && taskName in lightweightRootTasks }
 val shouldIncludeAllModules = providers.gradleProperty("neolinkmc.fullMatrix").orNull == "true" ||
-    requestedTasks.any { taskName -> ":" !in taskName && taskName !in diagnosticRootTasks }
+    requestedTasks.any { taskName ->
+        ":" !in taskName &&
+            taskName !in diagnosticRootTasks &&
+            taskName !in lightweightRootTasks
+    }
 
 fun requestedModuleNames(loader: String, allModules: List<String>, defaultModules: List<String>): List<String> {
     if (shouldIncludeAllModules) {
@@ -89,6 +95,9 @@ fun requestedModuleNames(loader: String, allModules: List<String>, defaultModule
     }
 
     if (isDefaultSyncRequest) {
+        return allModules.filter { it in defaultModules }
+    }
+    if (isRepresentativeSyncRequest) {
         return allModules.filter { it in defaultModules }
     }
 

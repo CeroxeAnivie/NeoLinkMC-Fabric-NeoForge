@@ -1,0 +1,48 @@
+name: minimal-verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: fabric-v26_1_2
+            gradle_task: :fabric:v26_1_2:remapJar
+          - label: neoforge-v26_1_2
+            gradle_task: :neoforge:v26_1_2:jar
+    env:
+      GRADLE_USER_HOME: ${{ runner.temp }}\neolinkmc-gradle-home
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: NeoLinkMC-Fabric-NeoForge
+
+      - uses: actions/checkout@v4
+        with:
+          repository: CeroxeAnivie/NeoLinkMC-Common
+          path: NeoLinkMC-Common
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Publish shared common artifact
+        shell: cmd
+        working-directory: NeoLinkMC-Common
+        run: gradlew.bat publishLocalDevelopmentPublicationToLocalDevelopmentRepository
+
+      - name: Verify ${{ matrix.label }}
+        shell: cmd
+        working-directory: NeoLinkMC-Fabric-NeoForge
+        env:
+          GRADLE_TASK: ${{ matrix.gradle_task }}
+        run: gradlew.bat -Pneolinkmc_common_repo=../NeoLinkMC-Common/build/repos/local-development %GRADLE_TASK%
